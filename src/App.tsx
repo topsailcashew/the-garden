@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "./firebase";
 import { UserSession } from "./types";
 import Onboarding from "./components/Onboarding";
 import LoveNotes from "./components/LoveNotes";
@@ -11,6 +13,7 @@ export default function App() {
   const [session, setSession] = useState<UserSession | null>(null);
   const [activeTab, setActiveTab] = useState<"notes" | "quest" | "dates" | "milestones">("notes");
   const [copied, setCopied] = useState<boolean>(false);
+  const [roomCreatedAt, setRoomCreatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user session exists in local storage
@@ -24,13 +27,42 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    // Pull the room's real creation date so the footer's "Est." date always
+    // matches what Milestones shows, instead of a hardcoded placeholder.
+    if (!session) return;
+    const fetchRoomMeta = async () => {
+      try {
+        const roomRef = doc(db, "rooms", session.roomId);
+        const roomSnap = await getDoc(roomRef);
+        if (roomSnap.exists()) {
+          const data = roomSnap.data();
+          if (typeof data.createdAt === "string") {
+            setRoomCreatedAt(data.createdAt);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching room metadata:", err);
+      }
+    };
+    fetchRoomMeta();
+  }, [session]);
+
   const handleOnboardingComplete = (newSession: UserSession) => {
     localStorage.setItem("courtship_session", JSON.stringify(newSession));
+    // Remember the room (not the passcode) so switching users on this device
+    // doesn't require retyping the room code every time.
+    const boyName = newSession.role === "boy" ? newSession.name : newSession.partnerName;
+    const girlName = newSession.role === "girl" ? newSession.name : newSession.partnerName;
+    localStorage.setItem(
+      "courtship_last_room",
+      JSON.stringify({ roomId: newSession.roomId, boyName, girlName })
+    );
     setSession(newSession);
   };
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to exit your private courtyard? Your room sync key will be saved locally.")) {
+    if (window.confirm("Are you sure you want to exit your private courtyard? You'll be able to quickly switch back from the welcome screen.")) {
       localStorage.removeItem("courtship_session");
       setSession(null);
     }
@@ -168,7 +200,11 @@ export default function App() {
 
       {/* Footer */}
       <footer className="mt-8 flex justify-between items-center text-[10px] uppercase tracking-[0.3em] opacity-60 border-t border-natural-border pt-6 max-w-6xl w-full mx-auto px-6 pb-8 select-none">
-        <span>Est. August 2024</span>
+        <span>
+          {roomCreatedAt
+            ? `Est. ${new Date(roomCreatedAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}`
+            : "Est. —"}
+        </span>
         <div className="flex gap-4 items-center">
           <div className="w-2.5 h-2.5 rounded-full bg-natural-green"></div>
           <span>Both partners connected</span>

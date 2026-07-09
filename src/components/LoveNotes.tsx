@@ -1,17 +1,30 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, writeBatch, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { Note, MoodEntry, UserSession } from "../types";
+import { useToast } from "./Toast";
 import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame } from "lucide-react";
 
 interface LoveNotesProps {
   session: UserSession;
 }
 
-const moodOptions = ["😊", "😍", "😴", "😢", "😡", "😌", "🥳", "😰", "🤒", "😎"];
+const moodOptions: { emoji: string; label: string }[] = [
+  { emoji: "😊", label: "Happy" },
+  { emoji: "😍", label: "In Love" },
+  { emoji: "😴", label: "Sleepy" },
+  { emoji: "😢", label: "Sad" },
+  { emoji: "😡", label: "Angry" },
+  { emoji: "😌", label: "Content" },
+  { emoji: "🥳", label: "Celebrating" },
+  { emoji: "😰", label: "Anxious" },
+  { emoji: "🤒", label: "Sick" },
+  { emoji: "😎", label: "Cool" }
+];
 
 export default function LoveNotes({ session }: LoveNotesProps) {
+  const { showToast } = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [content, setContent] = useState<string>("");
   const [paperType, setPaperType] = useState<Note["paperType"]>("rose");
@@ -24,6 +37,12 @@ export default function LoveNotes({ session }: LoveNotesProps) {
   const [savingMood, setSavingMood] = useState<boolean>(false);
   const today = new Date().toISOString().slice(0, 10);
   const partnerRole = session.role === "boy" ? "girl" : "boy";
+  const syncErrorShownRef = useRef(false);
+  const notifySyncError = (context: string) => {
+    if (syncErrorShownRef.current) return;
+    syncErrorShownRef.current = true;
+    showToast(`Couldn't sync ${context}. Check your connection or try reloading.`);
+  };
 
   // Paper options with styling classes
   const paperStyles = {
@@ -60,13 +79,20 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     const notesRef = collection(db, "rooms", session.roomId, "notes");
     const q = query(notesRef, orderBy("createdAt", "desc"));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedNotes: Note[] = [];
-      snapshot.forEach((docSnap) => {
-        fetchedNotes.push({ id: docSnap.id, ...docSnap.data() } as Note);
-      });
-      setNotes(fetchedNotes);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedNotes: Note[] = [];
+        snapshot.forEach((docSnap) => {
+          fetchedNotes.push({ id: docSnap.id, ...docSnap.data() } as Note);
+        });
+        setNotes(fetchedNotes);
+      },
+      (err) => {
+        console.error("Error syncing notes:", err);
+        notifySyncError("your love notes");
+      }
+    );
 
     return () => unsubscribe();
   }, [session.roomId]);
@@ -76,12 +102,22 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     const myMoodRef = doc(db, "rooms", session.roomId, "moods", `${session.role}_${today}`);
     const partnerMoodRef = doc(db, "rooms", session.roomId, "moods", `${partnerRole}_${today}`);
 
-    const unsubMine = onSnapshot(myMoodRef, (snap) => {
-      setMyMood(snap.exists() ? ({ id: snap.id, ...snap.data() } as MoodEntry) : null);
-    });
-    const unsubPartner = onSnapshot(partnerMoodRef, (snap) => {
-      setPartnerMood(snap.exists() ? ({ id: snap.id, ...snap.data() } as MoodEntry) : null);
-    });
+    const unsubMine = onSnapshot(
+      myMoodRef,
+      (snap) => setMyMood(snap.exists() ? ({ id: snap.id, ...snap.data() } as MoodEntry) : null),
+      (err) => {
+        console.error("Error syncing your mood:", err);
+        notifySyncError("today's mood");
+      }
+    );
+    const unsubPartner = onSnapshot(
+      partnerMoodRef,
+      (snap) => setPartnerMood(snap.exists() ? ({ id: snap.id, ...snap.data() } as MoodEntry) : null),
+      (err) => {
+        console.error("Error syncing partner mood:", err);
+        notifySyncError("today's mood");
+      }
+    );
 
     return () => {
       unsubMine();
@@ -102,6 +138,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
       await setDoc(moodRef, newMood, { merge: true });
     } catch (err) {
       console.error("Error setting mood:", err);
+      showToast("Failed to set your mood. Please try again.");
     } finally {
       setSavingMood(false);
     }
@@ -143,6 +180,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
         await updateDoc(noteRef, { read: true });
       } catch (err) {
         console.error("Error reading note:", err);
+        showToast("Failed to open that note. Please try again.");
       }
     }
   };
@@ -153,6 +191,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
       await updateDoc(noteRef, { emoji: newEmoji });
     } catch (err) {
       console.error("Error reacting to note:", err);
+      showToast("Failed to save your reaction. Please try again.");
     }
   };
 
@@ -169,6 +208,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
       await batch.commit();
     } catch (err) {
       console.error("Error marking all read:", err);
+      showToast("Failed to mark notes as read. Please try again.");
     }
   };
 
@@ -202,21 +242,21 @@ export default function LoveNotes({ session }: LoveNotesProps) {
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {moodOptions.map((m) => (
+            {moodOptions.map(({ emoji: moodEmoji, label }) => (
               <button
-                id={`mood-option-${m}`}
-                key={m}
+                id={`mood-option-${moodEmoji}`}
+                key={moodEmoji}
                 type="button"
                 disabled={savingMood}
-                onClick={() => handleSetMood(m)}
+                onClick={() => handleSetMood(moodEmoji)}
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all cursor-pointer disabled:opacity-50 ${
-                  myMood?.emoji === m
+                  myMood?.emoji === moodEmoji
                     ? "bg-natural-card-darker scale-110 shadow-sm border border-natural-border"
                     : "hover:bg-natural-card"
                 }`}
-                title={`Set mood to ${m}`}
+                title={label}
               >
-                {m}
+                {moodEmoji}
               </button>
             ))}
           </div>
@@ -341,7 +381,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
               <p className="text-xs text-natural-text/50 mt-1 max-w-xs leading-relaxed">Be the first to leave a sweet note, a quick reminder, or an inside joke for {session.partnerName}!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <AnimatePresence>
                 {notes.map((note) => {
                   const style = paperStyles[note.paperType] || paperStyles.rose;

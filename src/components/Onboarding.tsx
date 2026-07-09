@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -7,6 +7,12 @@ import { Heart, Key, User, ArrowRight, Loader2, Sparkles } from "lucide-react";
 
 interface OnboardingProps {
   onComplete: (session: UserSession) => void;
+}
+
+interface LastRoom {
+  roomId: string;
+  boyName: string;
+  girlName: string;
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
@@ -21,6 +27,55 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   // After room is joined/created, select who you are
   const [createdRoom, setCreatedRoom] = useState<Room | null>(null);
   const [step, setStep] = useState<1 | 2>(1); // 1 = Room Setup, 2 = Character Select
+
+  // Quick "welcome back" switcher for the last room used on this device
+  const [lastRoom, setLastRoom] = useState<LastRoom | null>(null);
+  const [showWelcomeBack, setShowWelcomeBack] = useState<boolean>(false);
+  const [quickSwitchLoading, setQuickSwitchLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("courtship_last_room");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.roomId && parsed?.boyName && parsed?.girlName) {
+          setLastRoom(parsed);
+          setShowWelcomeBack(true);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to parse last room cache:", err);
+    }
+  }, []);
+
+  const handleQuickContinue = async (role: "boy" | "girl") => {
+    if (!lastRoom) return;
+    setQuickSwitchLoading(true);
+    setError("");
+    try {
+      const roomRef = doc(db, "rooms", lastRoom.roomId);
+      const roomSnap = await getDoc(roomRef);
+      if (!roomSnap.exists()) {
+        setError("That room no longer exists. Please create or join a new one.");
+        setShowWelcomeBack(false);
+        localStorage.removeItem("courtship_last_room");
+        return;
+      }
+      const data = roomSnap.data() as Room;
+      const session: UserSession = {
+        role,
+        name: role === "boy" ? data.boyName : data.girlName,
+        partnerName: role === "boy" ? data.girlName : data.boyName,
+        roomId: lastRoom.roomId
+      };
+      onComplete(session);
+    } catch (err: any) {
+      console.error(err);
+      setError("Failed to continue. Try again!");
+    } finally {
+      setQuickSwitchLoading(false);
+    }
+  };
 
   const generateRoomId = (boy: string, girl: string, pass: string) => {
     const cleanBoy = boy.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -126,16 +181,76 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           <div className="w-16 h-16 bg-natural-card-darker rounded-full flex items-center justify-center mb-4">
             <Heart className="w-8 h-8 text-natural-terracotta fill-natural-terracotta/20 animate-pulse" />
           </div>
-          <h1 className="text-3xl font-serif font-light italic text-natural-text tracking-tight">Our Courtship Garden</h1>
+          <h1 className="text-3xl font-serif font-light italic text-natural-text tracking-tight">Our Little Garden</h1>
           <p className="text-natural-text/70 text-xs mt-2 max-w-xs leading-relaxed">
-            {step === 1 
+            {step === 1 && showWelcomeBack && lastRoom
+              ? "Welcome back! Pick up right where you left off."
+              : step === 1
               ? "A shared, private space to leave sweet notes, answer daily questions, and coordinate beautiful date plans."
               : "Welcome to your garden! Select who you are to begin your journey together."
             }
           </p>
         </div>
 
-        {step === 1 ? (
+        {step === 1 && showWelcomeBack && lastRoom ? (
+          <div className="space-y-6">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-100 text-red-700 text-xs rounded-xl text-center">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <button
+                id="quick-continue-boy"
+                onClick={() => handleQuickContinue("boy")}
+                disabled={quickSwitchLoading}
+                className="w-full border border-natural-border hover:border-natural-green hover:bg-natural-card rounded-2xl p-4 flex items-center justify-between text-left transition-all group cursor-pointer disabled:opacity-50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-natural-card-darker rounded-full flex items-center justify-center text-lg shadow-inner">🧑</div>
+                  <div>
+                    <h3 className="font-semibold text-natural-text group-hover:text-natural-olive text-sm">I am {lastRoom.boyName}</h3>
+                    <p className="text-[11px] text-natural-text/50">Continue as the boy</p>
+                  </div>
+                </div>
+                {quickSwitchLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-natural-text/40" />
+                ) : (
+                  <Sparkles className="w-5 h-5 text-natural-text/30 group-hover:text-natural-green opacity-0 group-hover:opacity-100 transition-all" />
+                )}
+              </button>
+
+              <button
+                id="quick-continue-girl"
+                onClick={() => handleQuickContinue("girl")}
+                disabled={quickSwitchLoading}
+                className="w-full border border-natural-border hover:border-natural-green hover:bg-natural-card rounded-2xl p-4 flex items-center justify-between text-left transition-all group cursor-pointer disabled:opacity-50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-natural-card-darker rounded-full flex items-center justify-center text-lg shadow-inner">👩</div>
+                  <div>
+                    <h3 className="font-semibold text-natural-text group-hover:text-natural-olive text-sm">I am {lastRoom.girlName}</h3>
+                    <p className="text-[11px] text-natural-text/50">Continue as the girl</p>
+                  </div>
+                </div>
+                {quickSwitchLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-natural-text/40" />
+                ) : (
+                  <Sparkles className="w-5 h-5 text-natural-text/30 group-hover:text-natural-green opacity-0 group-hover:opacity-100 transition-all" />
+                )}
+              </button>
+            </div>
+
+            <button
+              id="btn-different-room"
+              onClick={() => setShowWelcomeBack(false)}
+              className="w-full text-natural-text/60 hover:text-natural-text text-xs text-center block pt-2 transition-all font-serif italic"
+            >
+              Not us? Use a different room
+            </button>
+          </div>
+        ) : step === 1 ? (
           <div>
             {/* Toggle Mode Tab */}
             <div className="flex bg-natural-bg border border-natural-border p-1 rounded-xl mb-6">

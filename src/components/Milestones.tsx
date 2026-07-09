@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { collection, query, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { UserSession } from "../types";
+import { useToast } from "./Toast";
 import { Calendar, Award, Star, Flame, Heart, HeartHandshake, Gift, Hourglass, Edit2, Check } from "lucide-react";
 
 interface MilestonesProps {
@@ -10,6 +11,7 @@ interface MilestonesProps {
 }
 
 export default function Milestones({ session }: MilestonesProps) {
+  const { showToast } = useToast();
   const [totalNotes, setTotalNotes] = useState<number>(0);
   const [totalQuestions, setTotalQuestions] = useState<number>(0);
   const [totalDates, setTotalDates] = useState<number>(0);
@@ -26,35 +28,38 @@ export default function Milestones({ session }: MilestonesProps) {
   } | null>(null);
 
   useEffect(() => {
-    // Fetch stats
-    const fetchStats = async () => {
-      try {
-        const notesRef = collection(db, "rooms", session.roomId, "notes");
-        const notesSnap = await getDocs(notesRef);
-        setTotalNotes(notesSnap.size);
+    // Live subscriptions so stats update in real-time as either partner acts,
+    // instead of only refreshing when this tab remounts.
+    const notesRef = collection(db, "rooms", session.roomId, "notes");
+    const unsubNotes = onSnapshot(
+      notesRef,
+      (snap) => setTotalNotes(snap.size),
+      (err) => console.error("Error loading notes stat:", err)
+    );
 
-        const questionsRef = collection(db, "rooms", session.roomId, "questions");
-        const questionsSnap = await getDocs(questionsRef);
-        
+    const questionsRef = collection(db, "rooms", session.roomId, "questions");
+    const unsubQuestions = onSnapshot(
+      questionsRef,
+      (snap) => {
         // Only count questions where BOTH boy and girl answered
         let completeCount = 0;
-        questionsSnap.forEach((docSnap) => {
+        snap.forEach((docSnap) => {
           const data = docSnap.data();
           if (data.boyAnswer?.trim() && data.girlAnswer?.trim()) {
             completeCount++;
           }
         });
         setTotalQuestions(completeCount);
+      },
+      (err) => console.error("Error loading questions stat:", err)
+    );
 
-        const datesRef = collection(db, "rooms", session.roomId, "dates");
-        const datesSnap = await getDocs(datesRef);
-        setTotalDates(datesSnap.size);
-      } catch (err) {
-        console.error("Error loading milestone stats:", err);
-      }
-    };
-
-    fetchStats();
+    const datesRef = collection(db, "rooms", session.roomId, "dates");
+    const unsubDates = onSnapshot(
+      datesRef,
+      (snap) => setTotalDates(snap.size),
+      (err) => console.error("Error loading dates stat:", err)
+    );
 
     // Fetch Custom Start Date
     const fetchStartDate = async () => {
@@ -67,10 +72,14 @@ export default function Milestones({ session }: MilestonesProps) {
             setStartDateStr(data.courtshipStartDate);
             setDateInput(data.courtshipStartDate);
           } else {
-            // Default to room creation date or today
-            const defaultDate = new Date().toISOString().split("T")[0];
-            setStartDateStr(defaultDate);
-            setDateInput(defaultDate);
+            // Default to the room's actual creation date, only falling back
+            // to today if that's somehow missing too.
+            const fallback =
+              typeof data.createdAt === "string"
+                ? data.createdAt.split("T")[0]
+                : new Date().toISOString().split("T")[0];
+            setStartDateStr(fallback);
+            setDateInput(fallback);
           }
         }
       } catch (err) {
@@ -79,6 +88,12 @@ export default function Milestones({ session }: MilestonesProps) {
     };
 
     fetchStartDate();
+
+    return () => {
+      unsubNotes();
+      unsubQuestions();
+      unsubDates();
+    };
   }, [session.roomId]);
 
   // Handle saving customized courtship start date
@@ -91,6 +106,7 @@ export default function Milestones({ session }: MilestonesProps) {
       setIsEditingDate(false);
     } catch (err) {
       console.error("Error saving start date:", err);
+      showToast("Failed to save your custom start date. Please try again.");
     }
   };
 

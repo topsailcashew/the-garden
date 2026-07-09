@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { DatePlan, UserSession } from "../types";
+import { useToast } from "./Toast";
 import { Calendar, DollarSign, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2 } from "lucide-react";
 
 const parseShortDate = (rawDateStr: string) => {
@@ -27,11 +28,13 @@ interface DatePlannerProps {
 }
 
 export default function DatePlanner({ session }: DatePlannerProps) {
+  const { showToast } = useToast();
   const [dates, setDates] = useState<DatePlan[]>([]);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [now, setNow] = useState<Date>(new Date());
+  const formRef = useRef<HTMLDivElement>(null);
 
   // New Date form fields
   const [title, setTitle] = useState<string>("");
@@ -45,13 +48,20 @@ export default function DatePlanner({ session }: DatePlannerProps) {
     const datesRef = collection(db, "rooms", session.roomId, "dates");
     const q = query(datesRef, orderBy("date", "asc"));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedDates: DatePlan[] = [];
-      snapshot.forEach((docSnap) => {
-        fetchedDates.push({ id: docSnap.id, ...docSnap.data() } as DatePlan);
-      });
-      setDates(fetchedDates);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedDates: DatePlan[] = [];
+        snapshot.forEach((docSnap) => {
+          fetchedDates.push({ id: docSnap.id, ...docSnap.data() } as DatePlan);
+        });
+        setDates(fetchedDates);
+      },
+      (err) => {
+        console.error("Error syncing date plans:", err);
+        showToast("Couldn't sync date plans. Check your connection or try reloading.");
+      }
+    );
 
     return () => unsubscribe();
   }, [session.roomId]);
@@ -61,6 +71,17 @@ export default function DatePlanner({ session }: DatePlannerProps) {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    // Scroll the proposal form into view so opening it doesn't feel like
+    // nothing happened when it renders below the fold.
+    if (isFormOpen) {
+      const timeout = setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+      return () => clearTimeout(timeout);
+    }
+  }, [isFormOpen]);
 
   const handleProposeDate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +132,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
       await updateDoc(dateRef, updates);
     } catch (err) {
       console.error("Error updating date status:", err);
+      showToast("Failed to update that date's status. Please try again.");
     }
   };
 
@@ -121,6 +143,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
       await deleteDoc(dateRef);
     } catch (err) {
       console.error("Error deleting date:", err);
+      showToast("Failed to remove that date plan. Please try again.");
     }
   };
 
@@ -223,6 +246,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
       <AnimatePresence>
         {isFormOpen && (
           <motion.div
+            ref={formRef}
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
