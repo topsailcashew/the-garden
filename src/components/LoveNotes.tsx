@@ -4,7 +4,61 @@ import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, writeBa
 import { db } from "../firebase";
 import { Note, MoodEntry, UserSession } from "../types";
 import { useToast } from "./Toast";
-import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame } from "lucide-react";
+import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2 } from "lucide-react";
+
+const MAX_ORIGINAL_FILE_BYTES = 20 * 1024 * 1024; // 20MB, before compression
+const MAX_DATA_URI_LENGTH = 900_000; // keep well under Firestore's 1MB document limit
+
+// Resizes and compresses an image client-side into a small JPEG data URI,
+// since photos are stored directly on the note document (no Cloud Storage).
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      const maxDimension = 1200;
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas not supported"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+
+      let quality = 0.7;
+      let dataUri = canvas.toDataURL("image/jpeg", quality);
+      while (dataUri.length > MAX_DATA_URI_LENGTH && quality > 0.3) {
+        quality -= 0.15;
+        dataUri = canvas.toDataURL("image/jpeg", quality);
+      }
+      if (dataUri.length > MAX_DATA_URI_LENGTH) {
+        reject(new Error("TOO_LARGE"));
+        return;
+      }
+      resolve(dataUri);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("LOAD_FAILED"));
+    };
+    img.src = objectUrl;
+  });
+};
 
 interface LoveNotesProps {
   session: UserSession;
@@ -31,6 +85,10 @@ export default function LoveNotes({ session }: LoveNotesProps) {
   const [emoji, setEmoji] = useState<string>("💌");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [myMood, setMyMood] = useState<MoodEntry | null>(null);
   const [partnerMood, setPartnerMood] = useState<MoodEntry | null>(null);
@@ -144,9 +202,41 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     }
   };
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    if (file.size > MAX_ORIGINAL_FILE_BYTES) {
+      setError("That photo is too large. Please choose one under 20MB.");
+      return;
+    }
+
+    setError("");
+    setIsCompressing(true);
+    try {
+      const dataUri = await compressImage(file);
+      setImagePreview(dataUri);
+    } catch (err) {
+      console.error("Error compressing image:", err);
+      setError("That photo couldn't be processed. Try a smaller or different photo.");
+    } finally {
+      setIsCompressing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() && !imagePreview) return;
 
     setIsSubmitting(true);
     setError("");
@@ -159,11 +249,13 @@ export default function LoveNotes({ session }: LoveNotesProps) {
         createdAt: new Date().toISOString(),
         read: false,
         paperType,
-        emoji
+        emoji,
+        ...(imagePreview ? { imageUrl: imagePreview } : {})
       };
       await addDoc(notesRef, newNote);
       setContent("");
       setEmoji("💌");
+      handleRemoveImage();
     } catch (err: any) {
       console.error(err);
       setError("Failed to leave your note. Try again!");
@@ -270,7 +362,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
             <MessageSquareHeart className="w-6 h-6 text-natural-terracotta" />
             Shared Love Notes
           </h2>
-          <p className="text-xs text-natural-text/60 mt-1">Leave letters, post-its, and reminders on your private shared corkboard.</p>
+          <p className="text-xs text-natural-text/60 mt-1">Leave letters, photos, post-its, and reminders on your private shared corkboard.</p>
         </div>
         
         {notes.some((n) => n.sender !== session.role && !n.read) && (
@@ -301,7 +393,9 @@ export default function LoveNotes({ session }: LoveNotesProps) {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1">Message</label>
+                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1">
+                  Message{imagePreview ? " (optional caption)" : ""}
+                </label>
                 <textarea
                   id="note-textarea"
                   value={content}
@@ -314,6 +408,48 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                 <div className="flex justify-end text-[10px] text-natural-text/50 mt-1">
                   {content.length}/500 chars
                 </div>
+              </div>
+
+              {/* Photo attachment */}
+              <div>
+                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1.5">Photo (optional)</label>
+                <input
+                  ref={fileInputRef}
+                  id="note-image-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                {imagePreview ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-natural-border">
+                    <img id="note-image-preview" src={imagePreview} alt="Attached preview" className="w-full h-40 object-cover" />
+                    <button
+                      id="btn-remove-image"
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 cursor-pointer transition-all"
+                      title="Remove photo"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    id="btn-attach-image"
+                    type="button"
+                    disabled={isCompressing}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border border-dashed border-natural-border hover:border-natural-olive rounded-2xl py-4 flex flex-col items-center justify-center gap-1.5 text-natural-text/50 hover:text-natural-olive cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {isCompressing ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ImagePlus className="w-5 h-5" />
+                    )}
+                    <span className="text-[11px] font-medium">{isCompressing ? "Processing photo..." : "Attach a photo"}</span>
+                  </button>
+                )}
               </div>
 
               {/* Paper selector */}
@@ -363,10 +499,16 @@ export default function LoveNotes({ session }: LoveNotesProps) {
               <button
                 id="btn-send-note"
                 type="submit"
-                disabled={isSubmitting || !content.trim()}
+                disabled={isSubmitting || isCompressing || (!content.trim() && !imagePreview)}
                 className="w-full bg-natural-olive hover:bg-natural-olive-hover disabled:bg-natural-card-darker disabled:text-natural-text/40 text-white font-medium font-serif italic text-sm py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all mt-4"
               >
-                <Mail className="w-4 h-4" /> Seal & Leave Note
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" /> Seal & Leave Note
+                  </>
+                )}
               </button>
             </form>
           </div>
@@ -378,10 +520,10 @@ export default function LoveNotes({ session }: LoveNotesProps) {
             <div className="bg-white border border-dashed border-natural-border rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[300px] card-shadow">
               <div className="w-12 h-12 bg-natural-card-darker rounded-full flex items-center justify-center shadow-inner text-lg mb-3">✉️</div>
               <p className="text-sm font-serif font-light text-natural-text">The note board is currently quiet.</p>
-              <p className="text-xs text-natural-text/50 mt-1 max-w-xs leading-relaxed">Be the first to leave a sweet note, a quick reminder, or an inside joke for {session.partnerName}!</p>
+              <p className="text-xs text-natural-text/50 mt-1 max-w-xs leading-relaxed">Be the first to leave a sweet note, a photo, or an inside joke for {session.partnerName}!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
+            <div className="columns-1 sm:columns-2 xl:columns-3 gap-4">
               <AnimatePresence>
                 {notes.map((note) => {
                   const style = paperStyles[note.paperType] || paperStyles.rose;
@@ -396,7 +538,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
                       onClick={() => isLocked && handleOpenNote(note)}
-                      className={`border rounded-2xl p-5 shadow-sm relative transition-all overflow-hidden flex flex-col justify-between min-h-[160px] ${
+                      className={`border rounded-2xl p-5 shadow-sm relative transition-all overflow-hidden flex flex-col justify-between min-h-[160px] mb-4 break-inside-avoid ${
                         style.bg
                       } ${isLocked ? "cursor-pointer hover:shadow-md hover:scale-[1.01]" : ""}`}
                     >
@@ -428,9 +570,19 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                         </div>
                       ) : (
                         <div className="flex-1 flex flex-col justify-between">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words pr-2">
-                            {note.content}
-                          </p>
+                          {note.imageUrl && (
+                            <img
+                              id={`note-image-${note.id}`}
+                              src={note.imageUrl}
+                              alt="Attached photo"
+                              className="w-full rounded-xl mb-3 object-cover"
+                            />
+                          )}
+                          {note.content && (
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words pr-2">
+                              {note.content}
+                            </p>
+                          )}
 
                           {/* Footer with Seal Emoji & Interactive Reactions */}
                           <div className="flex justify-between items-center mt-4 pt-3 border-t border-stone-200/10">

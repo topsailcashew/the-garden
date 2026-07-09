@@ -22,7 +22,8 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Time the note was left" },
         "read": { "type": "boolean", "description": "Whether the note has been opened" },
         "paperType": { "type": "string", "enum": ["letter", "sticky", "parchment"], "description": "Visual style of the note" },
-        "emoji": { "type": "string", "description": "Sticker/seal emoji" }
+        "emoji": { "type": "string", "description": "Sticker/seal emoji" },
+        "imageUrl": { "type": "string", "description": "Attached photo, compressed client-side and stored as a base64 data URI (kept under Firestore's 1MB document limit)" }
       },
       "required": ["sender", "content", "createdAt", "read"]
     },

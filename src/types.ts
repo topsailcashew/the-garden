@@ -14,6 +14,7 @@ export interface Note {
   read: boolean;
   paperType: "letter" | "sticky" | "parchment" | "rose" | "indigo";
   emoji?: string; // Reaction
+  imageUrl?: string; // Attached photo, if any
 }
 
 export interface Question {

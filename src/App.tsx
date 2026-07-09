@@ -6,12 +6,11 @@ import Onboarding from "./components/Onboarding";
 import LoveNotes from "./components/LoveNotes";
 import DailyQuest from "./components/DailyQuest";
 import DatePlanner from "./components/DatePlanner";
-import Milestones from "./components/Milestones";
-import { Heart, Mail, Sparkles, Calendar, HeartHandshake, LogOut, Copy, Check } from "lucide-react";
+import { Heart, Mail, Sparkles, Calendar, LogOut, Copy, Check } from "lucide-react";
 
 export default function App() {
   const [session, setSession] = useState<UserSession | null>(null);
-  const [activeTab, setActiveTab] = useState<"notes" | "quest" | "dates" | "milestones">("notes");
+  const [activeTab, setActiveTab] = useState<"notes" | "quest" | "dates">("notes");
   const [copied, setCopied] = useState<boolean>(false);
   const [roomCreatedAt, setRoomCreatedAt] = useState<string | null>(null);
 
@@ -28,8 +27,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Pull the room's real creation date so the footer's "Est." date always
-    // matches what Milestones shows, instead of a hardcoded placeholder.
+    // Pull the room's real creation date so the footer's "Est." date
+    // reflects reality instead of a hardcoded placeholder.
     if (!session) return;
     const fetchRoomMeta = async () => {
       try {
@@ -176,17 +175,6 @@ export default function App() {
             <Calendar className="w-4 h-4" /> Date Planner
           </button>
 
-          <button
-            id="nav-milestones"
-            onClick={() => setActiveTab("milestones")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-medium font-serif italic transition-all cursor-pointer ${
-              activeTab === "milestones"
-                ? "bg-natural-olive text-white shadow-sm font-semibold"
-                : "text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
-            }`}
-          >
-            <HeartHandshake className="w-4 h-4" /> Milestones
-          </button>
         </div>
 
         {/* Tab Content Panel */}
@@ -194,7 +182,6 @@ export default function App() {
           {activeTab === "notes" && <LoveNotes session={session} />}
           {activeTab === "quest" && <DailyQuest session={session} />}
           {activeTab === "dates" && <DatePlanner session={session} />}
-          {activeTab === "milestones" && <Milestones session={session} />}
         </div>
       </main>
 
