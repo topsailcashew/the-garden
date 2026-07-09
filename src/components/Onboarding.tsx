@@ -77,11 +77,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
-  const generateRoomId = (boy: string, girl: string, pass: string) => {
-    const cleanBoy = boy.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    const cleanGirl = girl.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    const cleanPass = pass.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    return `room_${cleanBoy}_${cleanGirl}_${cleanPass}`;
+  const generateRoomId = (pass: string) => {
+    // Use exactly what was typed as the room code (just trimmed, and with
+    // slashes stripped since Firestore document IDs can't contain "/").
+    return pass.trim().replace(/\//g, "-");
   };
 
   const handleCreateRoom = async (e: React.FormEvent) => {
@@ -94,7 +93,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     setLoading(true);
 
     try {
-      const generatedId = generateRoomId(boyName, girlName, passcode);
+      const generatedId = generateRoomId(passcode);
       const roomRef = doc(db, "rooms", generatedId);
       const roomSnap = await getDoc(roomRef);
 
@@ -348,7 +347,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                     <input 
                       id="room-code-input"
                       type="text" 
-                      placeholder="e.g. room_jack_jill_sweet"
+                      placeholder="e.g. sweet"
                       value={roomIdInput}
                       onChange={(e) => setRoomIdInput(e.target.value)}
                       className="w-full bg-natural-card border border-natural-border rounded-xl py-3 pl-10 pr-4 text-sm text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none"
