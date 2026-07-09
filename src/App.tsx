@@ -1,18 +1,27 @@
-import { useState, useEffect } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { useState, useEffect, useRef } from "react";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { UserSession } from "./types";
 import Onboarding from "./components/Onboarding";
 import LoveNotes from "./components/LoveNotes";
 import DailyQuest from "./components/DailyQuest";
 import DatePlanner from "./components/DatePlanner";
-import { Heart, Mail, Sparkles, Calendar, LogOut, Copy, Check } from "lucide-react";
+import { useConfirm } from "./components/ConfirmDialog";
+import { useToast } from "./components/Toast";
+import { Heart, Mail, Sparkles, Calendar, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
 
 export default function App() {
+  const confirm = useConfirm();
+  const { showToast } = useToast();
   const [session, setSession] = useState<UserSession | null>(null);
   const [activeTab, setActiveTab] = useState<"notes" | "quest" | "dates">("notes");
   const [copied, setCopied] = useState<boolean>(false);
   const [roomCreatedAt, setRoomCreatedAt] = useState<string | null>(null);
+  const [codeRevealed, setCodeRevealed] = useState<boolean>(false);
+  const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
+  const [isEditingName, setIsEditingName] = useState<boolean>(false);
+  const [nameInput, setNameInput] = useState<string>("");
+  const [savingName, setSavingName] = useState<boolean>(false);
 
   useEffect(() => {
     // Check if user session exists in local storage
@@ -60,8 +69,14 @@ export default function App() {
     setSession(newSession);
   };
 
-  const handleLogout = () => {
-    if (window.confirm("Are you sure you want to exit your private courtyard? You'll be able to quickly switch back from the welcome screen.")) {
+  const handleLogout = async () => {
+    const confirmed = await confirm({
+      title: "Exit your private courtyard?",
+      message: "You'll be able to quickly switch back from the welcome screen without retyping your room code.",
+      confirmLabel: "Exit Room",
+      danger: true
+    });
+    if (confirmed) {
       localStorage.removeItem("courtship_session");
       setSession(null);
     }
@@ -72,6 +87,34 @@ export default function App() {
     navigator.clipboard.writeText(session.roomId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleOpenProfileMenu = () => {
+    if (!session) return;
+    setNameInput(session.name);
+    setIsEditingName(false);
+    setShowProfileMenu((v) => !v);
+  };
+
+  const handleSaveName = async () => {
+    if (!session || !nameInput.trim()) return;
+    setSavingName(true);
+    try {
+      const roomRef = doc(db, "rooms", session.roomId);
+      const field = session.role === "boy" ? "boyName" : "girlName";
+      await setDoc(roomRef, { [field]: nameInput.trim() }, { merge: true });
+
+      const updatedSession: UserSession = { ...session, name: nameInput.trim() };
+      localStorage.setItem("courtship_session", JSON.stringify(updatedSession));
+      setSession(updatedSession);
+      setIsEditingName(false);
+      showToast("Display name updated!", "success");
+    } catch (err) {
+      console.error("Error updating display name:", err);
+      showToast("Failed to update your name. Please try again.");
+    } finally {
+      setSavingName(false);
+    }
   };
 
   if (!session) {
@@ -96,40 +139,110 @@ export default function App() {
           </div>
 
           {/* User actions and room sharing */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            {/* Copy Room ID Button */}
-            <button
-              id="btn-copy-room-id"
-              onClick={handleCopyRoomId}
-              className="text-[10px] font-mono bg-natural-card hover:bg-natural-card-darker border border-natural-border py-1.5 px-2.5 rounded-xl text-natural-text transition-all cursor-pointer flex items-center gap-1"
-              title="Copy Room Code to share with your partner"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3 h-3 text-natural-green animate-scale" /> Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3 text-natural-text/70" /> Code: {session.roomId.slice(0, 12)}...
-                </>
-              )}
-            </button>
-
-            {/* Profile badge / role indicator */}
-            <div className="flex items-center gap-1.5 bg-natural-card-darker border border-natural-border px-3 py-1.5 rounded-full text-xs font-semibold text-natural-text">
-              <span className="text-sm">{session.role === "boy" ? "🧑" : "👩"}</span>
-              <span className="hidden sm:inline">Hello, {session.name}</span>
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap justify-end">
+            {/* Room Code: masked by default, reveal on demand, copy always works */}
+            <div className="flex items-center bg-natural-card border border-natural-border rounded-xl overflow-hidden">
+              <button
+                id="btn-reveal-room-code"
+                onClick={() => setCodeRevealed((v) => !v)}
+                className="p-1.5 pl-2.5 text-natural-text/60 hover:text-natural-text cursor-pointer transition-all"
+                title={codeRevealed ? "Hide room code" : "Reveal room code"}
+              >
+                {codeRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+              <span className="text-[10px] text-natural-text px-1 select-none">
+                {codeRevealed ? session.roomId : "•".repeat(Math.min(session.roomId.length, 14))}
+              </span>
+              <button
+                id="btn-copy-room-id"
+                onClick={handleCopyRoomId}
+                className="p-1.5 pr-2.5 text-natural-text/60 hover:text-natural-text cursor-pointer transition-all"
+                title="Copy room code to share with your partner"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-natural-green animate-scale" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
             </div>
 
-            {/* Logout/Exit Room */}
-            <button
-              id="btn-app-logout"
-              onClick={handleLogout}
-              className="p-2 text-natural-text/60 hover:text-natural-terracotta hover:bg-natural-card-darker rounded-full cursor-pointer transition-all"
-              title="Exit shared room"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            {/* Profile menu */}
+            <div className="relative">
+              <button
+                id="btn-profile-menu"
+                onClick={handleOpenProfileMenu}
+                className="flex items-center gap-1.5 bg-natural-card-darker hover:bg-natural-border/60 border border-natural-border px-3 py-1.5 rounded-full text-xs font-semibold text-natural-text transition-all cursor-pointer"
+              >
+                <span className="text-sm">{session.role === "boy" ? "🧑" : "👩"}</span>
+                <span className="hidden sm:inline">Hello, {session.name}</span>
+                <ChevronDown className={`w-3 h-3 text-natural-text/50 transition-transform ${showProfileMenu ? "rotate-180" : ""}`} />
+              </button>
+
+              {showProfileMenu && (
+                <>
+                  <div id="profile-menu-overlay" className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                  <div
+                    id="profile-menu-dropdown"
+                    className="absolute right-0 top-full mt-2 w-64 bg-white border border-natural-border rounded-2xl card-shadow z-50 p-4 textured-bg"
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-natural-text/40 mb-3">Your Profile</p>
+
+                    {isEditingName ? (
+                      <div className="space-y-2 mb-3">
+                        <input
+                          id="profile-name-input"
+                          type="text"
+                          value={nameInput}
+                          onChange={(e) => setNameInput(e.target.value)}
+                          className="w-full bg-natural-card border border-natural-border rounded-lg py-1.5 px-2.5 text-xs text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            id="btn-save-name"
+                            onClick={handleSaveName}
+                            disabled={savingName || !nameInput.trim()}
+                            className="flex-1 bg-natural-olive hover:bg-natural-olive-hover disabled:bg-natural-card-darker text-white text-[11px] font-medium py-1.5 rounded-lg cursor-pointer transition-all"
+                          >
+                            Save
+                          </button>
+                          <button
+                            id="btn-cancel-name"
+                            onClick={() => setIsEditingName(false)}
+                            className="flex-1 bg-natural-card hover:bg-natural-card-darker border border-natural-border text-natural-text text-[11px] font-medium py-1.5 rounded-lg cursor-pointer transition-all"
+                          >
+                            <XIcon className="w-3 h-3 inline" /> Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        id="btn-edit-name"
+                        onClick={() => setIsEditingName(true)}
+                        className="w-full flex items-center justify-between text-xs text-natural-text hover:bg-natural-card rounded-lg py-2 px-2 -mx-2 mb-1 cursor-pointer transition-all"
+                      >
+                        <span>Display Name: <strong>{session.name}</strong></span>
+                        <Pencil className="w-3 h-3 text-natural-text/40" />
+                      </button>
+                    )}
+
+                    <p className="text-[11px] text-natural-text/50 py-1.5">
+                      Sharing this garden with <strong className="text-natural-text/70">{session.partnerName}</strong>
+                    </p>
+
+                    <div className="border-t border-natural-border mt-2 pt-2">
+                      <button
+                        id="btn-app-logout"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-2 text-xs text-natural-terracotta hover:bg-natural-card rounded-lg py-2 px-2 -mx-2 cursor-pointer transition-all"
+                      >
+                        <LogOut className="w-3.5 h-3.5" /> Exit Shared Room
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>

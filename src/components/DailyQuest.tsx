@@ -4,13 +4,15 @@ import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, limit, g
 import { db } from "../firebase";
 import { Question, UserSession } from "../types";
 import { getQuestionOfToday } from "../data/questions";
-import { Lock, Unlock, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart } from "lucide-react";
+import { useConfirm } from "./ConfirmDialog";
+import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart } from "lucide-react";
 
 interface DailyQuestProps {
   session: UserSession;
 }
 
 export default function DailyQuest({ session }: DailyQuestProps) {
+  const confirm = useConfirm();
   const [todayQuestion, setTodayQuestion] = useState<Question | null>(null);
   const [answerInput, setAnswerInput] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -135,6 +137,20 @@ export default function DailyQuest({ session }: DailyQuestProps) {
   const handleSetCustomQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customQuestionInput.trim()) return;
+
+    const hasExistingAnswers = hasBoyAnswered || hasGirlAnswered;
+    const bothAnswered = hasBoyAnswered && hasGirlAnswered;
+    const confirmed = await confirm({
+      title: "Replace today's question?",
+      message: hasExistingAnswers
+        ? `${bothAnswered ? "Both of you have" : "One of you has"} already answered today's question. Overwriting it will permanently erase ${
+            bothAnswered ? "both answers" : "that answer"
+          } so you can start fresh.`
+        : "This will replace today's question for both of you.",
+      confirmLabel: "Replace Question",
+      danger: hasExistingAnswers
+    });
+    if (!confirmed) return;
 
     setLoadingHistory(true);
     setError("");
@@ -309,7 +325,7 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                     </span>
                     {hasPartnerAnswered ? (
                       <span className="text-[10px] bg-natural-card border border-natural-border text-natural-olive font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                        <Unlock className="w-3 h-3" /> Answered
+                        <Eye className="w-3 h-3" /> Revealed
                       </span>
                     ) : (
                       <span className="text-[10px] bg-natural-card-darker border border-natural-border text-natural-text/50 font-bold px-2.5 py-0.5 rounded-full">

@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, writeBatch, setDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, addDoc, doc, updateDoc, deleteDoc, writeBatch, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { Note, MoodEntry, UserSession } from "../types";
 import { useToast } from "./Toast";
-import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2 } from "lucide-react";
+import { useConfirm } from "./ConfirmDialog";
+import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search } from "lucide-react";
+
+const NOTES_PAGE_SIZE = 30;
 
 const MAX_ORIGINAL_FILE_BYTES = 20 * 1024 * 1024; // 20MB, before compression
 const MAX_DATA_URI_LENGTH = 900_000; // keep well under Firestore's 1MB document limit
@@ -79,7 +82,10 @@ const moodOptions: { emoji: string; label: string }[] = [
 
 export default function LoveNotes({ session }: LoveNotesProps) {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [notes, setNotes] = useState<Note[]>([]);
+  const [noteLimit, setNoteLimit] = useState<number>(NOTES_PAGE_SIZE);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [content, setContent] = useState<string>("");
   const [paperType, setPaperType] = useState<Note["paperType"]>("rose");
   const [emoji, setEmoji] = useState<string>("💌");
@@ -133,9 +139,10 @@ export default function LoveNotes({ session }: LoveNotesProps) {
   const emojiOptions = ["💌", "❤️", "🌹", "✨", "🥰", "🐣", "🍫", "🧸", "🕊️"];
 
   useEffect(() => {
-    // Real-time subscription to notes in the current room
+    // Real-time subscription to notes in the current room, capped so the
+    // board stays fast as the archive grows; "Load More" raises the cap.
     const notesRef = collection(db, "rooms", session.roomId, "notes");
-    const q = query(notesRef, orderBy("createdAt", "desc"));
+    const q = query(notesRef, orderBy("createdAt", "desc"), limit(noteLimit));
 
     const unsubscribe = onSnapshot(
       q,
@@ -153,7 +160,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     );
 
     return () => unsubscribe();
-  }, [session.roomId]);
+  }, [session.roomId, noteLimit]);
 
   useEffect(() => {
     // Real-time subscription to today's mood check-ins for both partners
@@ -287,6 +294,24 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     }
   };
 
+  const handleDeleteNote = async (noteId: string) => {
+    const confirmed = await confirm({
+      title: "Delete this note?",
+      message: "This will permanently remove it from your shared board for both of you. This can't be undone.",
+      confirmLabel: "Delete Note",
+      danger: true
+    });
+    if (!confirmed) return;
+
+    try {
+      const noteRef = doc(db, "rooms", session.roomId, "notes", noteId);
+      await deleteDoc(noteRef);
+    } catch (err) {
+      console.error("Error deleting note:", err);
+      showToast("Failed to delete that note. Please try again.");
+    }
+  };
+
   const handleMarkAllRead = async () => {
     const unreadNotes = notes.filter((n) => n.sender !== session.role && !n.read);
     if (unreadNotes.length === 0) return;
@@ -313,6 +338,10 @@ export default function LoveNotes({ session }: LoveNotesProps) {
       return "";
     }
   };
+
+  const filteredNotes = searchQuery.trim()
+    ? notes.filter((n) => n.content.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : notes;
 
   return (
     <div id="love-notes-root" className="space-y-6">
@@ -496,6 +525,23 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                 </div>
               </div>
 
+              {/* Live preview of how the note will actually look */}
+              <div>
+                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1.5">Preview</label>
+                <div className={`border rounded-2xl p-4 min-h-[100px] ${paperStyles[paperType].bg}`}>
+                  <div className="flex items-center gap-1.5 mb-2 text-xs text-stone-500">
+                    <span className="text-base">{emoji}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-stone-400">Seal</span>
+                  </div>
+                  {imagePreview && (
+                    <img id="preview-image" src={imagePreview} alt="Preview" className="w-full max-h-32 object-cover rounded-xl mb-2" />
+                  )}
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {content.trim() || <span className="text-natural-text/30 italic">Your message will appear here...</span>}
+                  </p>
+                </div>
+              </div>
+
               <button
                 id="btn-send-note"
                 type="submit"
@@ -516,16 +562,37 @@ export default function LoveNotes({ session }: LoveNotesProps) {
 
         {/* Notes Board */}
         <div className="lg:col-span-2">
+          {notes.length > 0 && (
+            <div className="relative mb-4">
+              <Search className="w-3.5 h-3.5 text-natural-text/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                id="notes-search-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search loaded notes..."
+                className="w-full bg-white border border-natural-border rounded-xl py-2 pl-9 pr-3.5 text-xs text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none placeholder:text-natural-text/40"
+              />
+            </div>
+          )}
+
           {notes.length === 0 ? (
             <div className="bg-white border border-dashed border-natural-border rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[300px] card-shadow">
               <div className="w-12 h-12 bg-natural-card-darker rounded-full flex items-center justify-center shadow-inner text-lg mb-3">✉️</div>
               <p className="text-sm font-serif font-light text-natural-text">The note board is currently quiet.</p>
               <p className="text-xs text-natural-text/50 mt-1 max-w-xs leading-relaxed">Be the first to leave a sweet note, a photo, or an inside joke for {session.partnerName}!</p>
             </div>
+          ) : filteredNotes.length === 0 ? (
+            <div className="bg-white border border-dashed border-natural-border rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[200px] card-shadow">
+              <p className="text-sm font-serif font-light text-natural-text">No notes match "{searchQuery}".</p>
+              <p className="text-xs text-natural-text/50 mt-1">
+                {notes.length >= noteLimit ? "Try loading more notes below, or a different search term." : "Try a different search term."}
+              </p>
+            </div>
           ) : (
             <div className="columns-1 sm:columns-2 xl:columns-3 gap-4">
               <AnimatePresence>
-                {notes.map((note) => {
+                {filteredNotes.map((note) => {
                   const style = paperStyles[note.paperType] || paperStyles.rose;
                   const isOwn = note.sender === session.role;
                   const isLocked = !isOwn && !note.read;
@@ -548,14 +615,27 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                           {isOwn ? "Left by You" : `From ${session.partnerName}`}
                         </span>
                         
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           {/* Unread badge or Seal */}
                           {note.sender !== session.role && !note.read && (
                             <span className="bg-rose-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full animate-bounce">
                               New
                             </span>
                           )}
-                          <span className="text-xs font-mono text-stone-400">{formatNoteTime(note.createdAt)}</span>
+                          <span className="text-xs font-serif italic text-stone-400">{formatNoteTime(note.createdAt)}</span>
+                          {isOwn && (
+                            <button
+                              id={`btn-delete-note-${note.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteNote(note.id);
+                              }}
+                              className="text-stone-400 hover:text-natural-terracotta transition-all cursor-pointer"
+                              title="Delete this note"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -586,14 +666,14 @@ export default function LoveNotes({ session }: LoveNotesProps) {
 
                           {/* Footer with Seal Emoji & Interactive Reactions */}
                           <div className="flex justify-between items-center mt-4 pt-3 border-t border-stone-200/10">
-                            {/* Original Seal icon */}
-                            <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                              <span className="text-base">{note.emoji || "💌"}</span>
-                              <span className="text-[10px] font-medium text-stone-400">Wax Sealed</span>
+                            {/* Original Seal badge - distinct pill so it doesn't read as another reaction option */}
+                            <div className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] rounded-full pl-1.5 pr-2.5 py-1">
+                              <span className="text-sm">{note.emoji || "💌"}</span>
+                              <span className="text-[9px] font-bold uppercase tracking-wide text-stone-400">Seal</span>
                             </div>
 
-                            {/* Easy Reaction Buttons */}
-                            <div className="flex gap-1">
+                            {/* Easy Reaction Buttons, grouped in their own pill so they read as a separate control */}
+                            <div className="flex items-center gap-0.5 bg-white/70 border border-stone-200/60 rounded-full p-1" title="React to this note">
                               {["❤️", "🥰", "🌹", "✨"].map((reaction) => (
                                 <button
                                   id={`react-${note.id}-${reaction}`}
@@ -602,8 +682,8 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                                     e.stopPropagation();
                                     handleReactToNote(note.id, reaction);
                                   }}
-                                  className={`w-6 h-6 rounded-full hover:bg-black/5 flex items-center justify-center text-xs transition-all active:scale-125 cursor-pointer ${
-                                    note.emoji === reaction ? "bg-black/5 border border-stone-200/40" : "opacity-40 hover:opacity-100"
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all active:scale-125 cursor-pointer hover:scale-110 ${
+                                    note.emoji === reaction ? "bg-stone-200/70 border border-stone-300 shadow-inner" : "hover:bg-black/5"
                                   }`}
                                   title={`React with ${reaction}`}
                                 >
@@ -623,6 +703,18 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                   );
                 })}
               </AnimatePresence>
+            </div>
+          )}
+
+          {notes.length >= noteLimit && (
+            <div className="flex justify-center mt-4">
+              <button
+                id="btn-load-more-notes"
+                onClick={() => setNoteLimit((l) => l + NOTES_PAGE_SIZE)}
+                className="text-xs bg-white hover:bg-natural-card border border-natural-border text-natural-text py-2 px-4 rounded-full cursor-pointer transition-all"
+              >
+                Load Older Notes
+              </button>
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, deleteD
 import { db } from "../firebase";
 import { DatePlan, UserSession } from "../types";
 import { useToast } from "./Toast";
+import { useConfirm } from "./ConfirmDialog";
 import { Calendar, DollarSign, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2 } from "lucide-react";
 
 const parseShortDate = (rawDateStr: string) => {
@@ -29,6 +30,7 @@ interface DatePlannerProps {
 
 export default function DatePlanner({ session }: DatePlannerProps) {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [dates, setDates] = useState<DatePlan[]>([]);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -137,7 +139,13 @@ export default function DatePlanner({ session }: DatePlannerProps) {
   };
 
   const handleDeleteDate = async (dateId: string) => {
-    if (!window.confirm("Are you sure you want to remove this date plan?")) return;
+    const confirmed = await confirm({
+      title: "Remove this date plan?",
+      message: "This will permanently delete it for both of you. This can't be undone.",
+      confirmLabel: "Remove Date",
+      danger: true
+    });
+    if (!confirmed) return;
     try {
       const dateRef = doc(db, "rooms", session.roomId, "dates", dateId);
       await deleteDoc(dateRef);
@@ -162,6 +170,17 @@ export default function DatePlanner({ session }: DatePlannerProps) {
       });
     } catch {
       return rawDateStr;
+    }
+  };
+
+  // Since there's no push-notification backend, nudge the proposer with an
+  // escalating visual cue based on how long the invite has sat unanswered.
+  const getDaysAwaitingRsvp = (createdAt: string) => {
+    try {
+      const created = new Date(createdAt).getTime();
+      return Math.max(0, Math.floor((now.getTime() - created) / (1000 * 60 * 60 * 24)));
+    } catch {
+      return 0;
     }
   };
 
@@ -298,7 +317,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                       value={dateStr}
                       onChange={(e) => setDateStr(e.target.value)}
                       required
-                      className="w-full bg-natural-card border border-natural-border rounded-xl py-2.5 px-3.5 text-xs text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none"
+                      className="w-full bg-natural-card border border-natural-border rounded-xl py-2.5 px-3.5 text-xs text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none [color-scheme:light] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
                     />
                   </div>
 
@@ -486,7 +505,17 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                       <div className="flex gap-2">
                         {isMyProposal ? (
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-natural-text/50 italic font-serif">Awaiting partner RSVP...</span>
+                            {(() => {
+                              const daysWaiting = getDaysAwaitingRsvp(d.createdAt);
+                              if (daysWaiting >= 2) {
+                                return (
+                                  <span className="text-[10px] text-natural-terracotta font-bold font-serif italic flex items-center gap-1">
+                                    <Clock className="w-3 h-3" /> Still awaiting RSVP · {daysWaiting}d
+                                  </span>
+                                );
+                              }
+                              return <span className="text-[10px] text-natural-text/50 italic font-serif">Awaiting partner RSVP...</span>;
+                            })()}
                             <button
                               id={`btn-delete-proposed-my-${d.id}`}
                               onClick={() => handleDeleteDate(d.id)}
