@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Couple Rooms
+    match /rooms/{roomId} {
+      // Allow reading/writing to the room itself
+      allow read, write: if true;
+
+      // Allow access to subcollections inside a valid room
+      match /notes/{noteId} {
+        allow read, write: if true;
+      }
+
+      match /questions/{questionId} {
+        allow read, write: if true;
+      }
+
+      match /dates/{dateId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

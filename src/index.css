@@ -1,0 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  
+  --color-natural-bg: #F5F5F0;
+  --color-natural-text: #4A4A40;
+  --color-natural-card: #F9F9F7;
+  --color-natural-card-darker: #EAEAE2;
+  --color-natural-border: #D6D6CD;
+  --color-natural-green: #8A9A5B;
+  --color-natural-green-hover: #75854C;
+  --color-natural-terracotta: #CC7A5C;
+  --color-natural-terracotta-hover: #B56548;
+  --color-natural-olive: #5A5A40;
+  --color-natural-olive-hover: #484833;
+}
+
+@utility card-shadow {
+  box-shadow: 0 10px 25px -5px rgba(90, 90, 64, 0.08);
+}
+
+@utility textured-bg {
+  background-image: radial-gradient(#d6d6cd 0.5px, transparent 0.5px);
+  background-size: 24px 24px;
+}

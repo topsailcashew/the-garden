@@ -1,0 +1,6 @@
+{
+  "name": "Courtship Journal & Date Planner",
+  "description": "A shared space for a courting couple to write daily notes, answer get-to-know-each-other questions, and schedule date plans.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

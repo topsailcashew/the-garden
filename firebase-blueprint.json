@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Room",
+      "description": "A shared room for a courting couple",
+      "type": "object",
+      "properties": {
+        "boyName": { "type": "string", "description": "The boy's name" },
+        "girlName": { "type": "string", "description": "The girl's name" },
+        "passcode": { "type": "string", "description": "Shared passcode" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["boyName", "girlName", "passcode"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A romantic note left for a partner",
+      "type": "object",
+      "properties": {
+        "sender": { "type": "string", "enum": ["boy", "girl"], "description": "The sender of the note" },
+        "content": { "type": "string", "description": "The contents of the note" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Time the note was left" },
+        "read": { "type": "boolean", "description": "Whether the note has been opened" },
+        "paperType": { "type": "string", "enum": ["letter", "sticky", "parchment"], "description": "Visual style of the note" },
+        "emoji": { "type": "string", "description": "Sticker/seal emoji" }
+      },
+      "required": ["sender", "content", "createdAt", "read"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "A get-to-know-you daily question and answers",
+      "type": "object",
+      "properties": {
+        "questionText": { "type": "string", "description": "The daily question text" },
+        "boyAnswer": { "type": "string", "description": "The boy's answer" },
+        "girlAnswer": { "type": "string", "description": "The girl's answer" },
+        "boyAnsweredAt": { "type": "string", "format": "date-time", "description": "Time the boy answered" },
+        "girlAnsweredAt": { "type": "string", "format": "date-time", "description": "Time the girl answered" }
+      },
+      "required": ["questionText"]
+    },
+    "DatePlan": {
+      "title": "DatePlan",
+      "description": "A scheduled or proposed date plan",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "What the date is" },
+        "description": { "type": "string", "description": "Details of the date" },
+        "date": { "type": "string", "description": "When the date is planned for" },
+        "cost": { "type": "string", "description": "How much it costs" },
+        "prepare": { "type": "string", "description": "What to prepare" },
+        "status": { "type": "string", "enum": ["proposed", "confirmed", "completed", "declined"], "description": "Status of the date plan" },
+        "proposedBy": { "type": "string", "enum": ["boy", "girl"], "description": "Who proposed the date" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Time the date plan was created" }
+      },
+      "required": ["title", "date", "cost", "prepare", "status", "proposedBy"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Master document representing a couple's shared room"
+    },
+    "/rooms/{roomId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Love notes exchanged between the couple"
+    },
+    "/rooms/{roomId}/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Daily quest questions and corresponding answers"
+    },
+    "/rooms/{roomId}/dates/{dateId}": {
+      "schema": "DatePlan",
+      "description": "Timeline of planned dates"
+    }
+  }
+}
