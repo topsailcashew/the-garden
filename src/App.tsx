@@ -93,6 +93,7 @@ export default function App() {
     if (!session) return;
     setNameInput(session.name);
     setIsEditingName(false);
+    setCodeRevealed(false);
     setShowProfileMenu((v) => !v);
   };
 
@@ -124,8 +125,8 @@ export default function App() {
   return (
     <div id="app-root" className="min-h-screen bg-natural-bg text-natural-text font-sans relative flex flex-col justify-between">
       {/* Top Header */}
-      <header className="bg-natural-bg border-b border-natural-border pb-6 pt-5 px-6 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
+      <header className="bg-natural-bg border-b border-natural-border py-4 px-6 sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto flex flex-row justify-between items-center gap-4">
           {/* Logo & Names */}
           <div className="flex flex-col">
             <span className="text-[10px] uppercase tracking-[0.2em] text-natural-text/60 mb-1">
@@ -139,30 +140,7 @@ export default function App() {
           </div>
 
           {/* User actions and room sharing */}
-          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap justify-end">
-            {/* Room Code: masked by default, reveal on demand, copy always works */}
-            <div className="flex items-center bg-natural-card border border-natural-border rounded-xl overflow-hidden">
-              <button
-                id="btn-reveal-room-code"
-                onClick={() => setCodeRevealed((v) => !v)}
-                className="p-1.5 pl-2.5 text-natural-text/60 hover:text-natural-text cursor-pointer transition-all"
-                title={codeRevealed ? "Hide room code" : "Reveal room code"}
-              >
-                {codeRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-              <span className="text-[10px] text-natural-text px-1 select-none">
-                {codeRevealed ? session.roomId : "•".repeat(Math.min(session.roomId.length, 14))}
-              </span>
-              <button
-                id="btn-copy-room-id"
-                onClick={handleCopyRoomId}
-                className="p-1.5 pr-2.5 text-natural-text/60 hover:text-natural-text cursor-pointer transition-all"
-                title="Copy room code to share with your partner"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-natural-green animate-scale" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Profile menu */}
             <div className="relative">
               <button
@@ -227,7 +205,32 @@ export default function App() {
                       Sharing this garden with <strong className="text-natural-text/70">{session.partnerName}</strong>
                     </p>
 
-                    <div className="border-t border-natural-border mt-2 pt-2">
+                    <div className="border-t border-natural-border mt-2 pt-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-natural-text/40 mb-1.5">Room Code</p>
+                      <div className="flex items-center bg-natural-card border border-natural-border rounded-lg overflow-hidden">
+                        <button
+                          id="btn-reveal-room-code"
+                          onClick={() => setCodeRevealed((v) => !v)}
+                          className="p-1.5 pl-2 text-natural-text/60 hover:text-natural-text cursor-pointer transition-all flex-shrink-0"
+                          title={codeRevealed ? "Hide room code" : "Reveal room code"}
+                        >
+                          {codeRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <span className="flex-1 text-[11px] text-natural-text px-1 select-none truncate">
+                          {codeRevealed ? session.roomId : "•".repeat(Math.min(session.roomId.length, 14))}
+                        </span>
+                        <button
+                          id="btn-copy-room-id"
+                          onClick={handleCopyRoomId}
+                          className="p-1.5 pr-2 text-natural-text/60 hover:text-natural-text cursor-pointer transition-all flex-shrink-0"
+                          title="Copy room code to share with your partner"
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5 text-natural-green animate-scale" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-natural-border mt-3 pt-2">
                       <button
                         id="btn-app-logout"
                         onClick={() => {

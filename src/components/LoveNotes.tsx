@@ -67,18 +67,88 @@ interface LoveNotesProps {
   session: UserSession;
 }
 
-const moodOptions: { emoji: string; label: string }[] = [
-  { emoji: "😊", label: "Happy" },
-  { emoji: "😍", label: "In Love" },
-  { emoji: "😴", label: "Sleepy" },
-  { emoji: "😢", label: "Sad" },
-  { emoji: "😡", label: "Angry" },
-  { emoji: "😌", label: "Content" },
-  { emoji: "🥳", label: "Celebrating" },
-  { emoji: "😰", label: "Anxious" },
-  { emoji: "🤒", label: "Sick" },
-  { emoji: "😎", label: "Cool" }
+interface MoodOption {
+  emoji: string;
+  label: string;
+  color: string;
+  caption: string;
+  suggestion: (name: string, pronoun: string) => string;
+}
+
+const moodOptions: MoodOption[] = [
+  {
+    emoji: "😊",
+    label: "Happy",
+    color: "#F2B84B",
+    caption: "feeling happy",
+    suggestion: (name) => `${name} is feeling happy today — celebrate the good mood together!`
+  },
+  {
+    emoji: "😍",
+    label: "In Love",
+    color: "#F0879A",
+    caption: "feeling smitten",
+    suggestion: (name, p) => `${name} is feeling smitten — shower ${p} with a little extra sweetness!`
+  },
+  {
+    emoji: "😴",
+    label: "Sleepy",
+    color: "#A8A0D8",
+    caption: "feeling sleepy",
+    suggestion: (name, p) => `${name} is feeling sleepy — send ${p} something cozy to help them unwind...`
+  },
+  {
+    emoji: "😢",
+    label: "Sad",
+    color: "#8FB8DE",
+    caption: "feeling a little down",
+    suggestion: (name, p) => `${name} is feeling a little down, offer ${p} some comfort and encouragement...`
+  },
+  {
+    emoji: "😡",
+    label: "Angry",
+    color: "#E0755F",
+    caption: "feeling frustrated",
+    suggestion: (name, p) => `${name} is feeling frustrated, offer ${p} some comfort and encouragement...`
+  },
+  {
+    emoji: "😌",
+    label: "Content",
+    color: "#9DBF8A",
+    caption: "feeling at peace",
+    suggestion: (name) => `${name} is feeling at peace — share something you're both grateful for...`
+  },
+  {
+    emoji: "🥳",
+    label: "Celebrating",
+    color: "#F0A83E",
+    caption: "in full celebration mode",
+    suggestion: (name, p) => `${name} is in full celebration mode — join in and hype ${p} up!`
+  },
+  {
+    emoji: "😰",
+    label: "Anxious",
+    color: "#B99CD6",
+    caption: "feeling a bit anxious",
+    suggestion: (name, p) => `${name} is feeling a bit anxious, remind ${p} that everything will be okay...`
+  },
+  {
+    emoji: "🤒",
+    label: "Sick",
+    color: "#8EC28A",
+    caption: "not feeling well",
+    suggestion: (name, p) => `${name} isn't feeling well — send ${p} some get-well wishes and TLC...`
+  },
+  {
+    emoji: "😎",
+    label: "Cool",
+    color: "#6FADC4",
+    caption: "feeling cool as ever",
+    suggestion: (name, p) => `${name} is feeling cool as ever — keep the good vibes going with ${p}!`
+  }
 ];
+
+const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === emoji);
 
 export default function LoveNotes({ session }: LoveNotesProps) {
   const { showToast } = useToast();
@@ -343,44 +413,98 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     ? notes.filter((n) => n.content.toLowerCase().includes(searchQuery.trim().toLowerCase()))
     : notes;
 
+  // Nudge the composer's placeholder based on the partner's mood today, so
+  // the note you write is more likely to actually meet them where they're at.
+  const partnerPronoun = partnerRole === "girl" ? "her" : "him";
+  const partnerMoodOption = getMoodOption(partnerMood?.emoji);
+  const composerPlaceholder = partnerMoodOption
+    ? partnerMoodOption.suggestion(session.partnerName, partnerPronoun)
+    : `Write something beautiful, encouraging, or exciting for ${session.partnerName}...`;
+
   return (
     <div id="love-notes-root" className="space-y-6">
       {/* Daily Mood Tracker */}
-      <div id="mood-tracker" className="bg-white border border-natural-border rounded-[32px] p-5 card-shadow textured-bg animate-fade-in">
-        <h3 className="font-serif text-sm text-natural-text mb-3 flex items-center gap-2 italic font-light">
+      <div id="mood-tracker" className="relative bg-white border border-natural-border rounded-[32px] p-5 card-shadow textured-bg animate-fade-in overflow-hidden">
+        {/* Big faint decorative emoji in the corner, echoing whatever mood is winning today */}
+        <div className="absolute -top-6 -right-4 text-8xl opacity-[0.05] rotate-12 pointer-events-none select-none">
+          {myMood?.emoji || partnerMood?.emoji || "🌱"}
+        </div>
+
+        <h3 className="font-serif text-sm text-natural-text mb-4 flex items-center gap-2 italic font-light relative">
           <Smile className="w-4 h-4 text-natural-terracotta" /> Today's Mood
         </h3>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-5">
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-2xl leading-none" title="Your mood today">{myMood?.emoji || "➖"}</span>
-              <span className="text-[10px] font-bold text-natural-text/50 uppercase">You</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-2xl leading-none" title={`${session.partnerName}'s mood today`}>{partnerMood?.emoji || "➖"}</span>
-              <span className="text-[10px] font-bold text-natural-text/50 uppercase">{session.partnerName}</span>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {moodOptions.map(({ emoji: moodEmoji, label }) => (
-              <button
+        <div className="flex flex-wrap items-center gap-6 mb-4 relative">
+          {[
+            { label: "You", mood: myMood },
+            { label: session.partnerName, mood: partnerMood }
+          ].map(({ label, mood }) => {
+            const option = getMoodOption(mood?.emoji);
+            return (
+              <div key={label} className="flex flex-col items-center gap-1.5">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={mood?.emoji || "none"}
+                    initial={{ scale: 0.5, opacity: 0, rotate: -15 }}
+                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                    exit={{ scale: 0.5, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                    className="w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner"
+                    style={{ backgroundColor: option ? `${option.color}30` : "var(--color-natural-card)" }}
+                    title={mood?.emoji ? option?.label : "No mood set yet"}
+                  >
+                    {mood?.emoji || "➖"}
+                  </motion.div>
+                </AnimatePresence>
+                <span className="text-[10px] font-bold text-natural-text/50 uppercase">{label}</span>
+              </div>
+            );
+          })}
+
+          {/* Fun combined caption */}
+          <AnimatePresence>
+            {myMood?.emoji && partnerMood?.emoji && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className={`text-xs font-serif italic rounded-full px-3.5 py-2 flex-1 min-w-[180px] ${
+                  myMood.emoji === partnerMood.emoji
+                    ? "bg-natural-green/15 text-natural-green font-semibold"
+                    : "bg-natural-card text-natural-text/70"
+                }`}
+              >
+                {myMood.emoji === partnerMood.emoji
+                  ? `✨ You're mood twins today — both ${getMoodOption(myMood.emoji)?.caption}!`
+                  : `You're ${getMoodOption(myMood.emoji)?.caption}, ${session.partnerName} is ${getMoodOption(partnerMood.emoji)?.caption}.`}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="flex flex-wrap gap-2 relative">
+          {moodOptions.map(({ emoji: moodEmoji, label, color }) => {
+            const isSelected = myMood?.emoji === moodEmoji;
+            return (
+              <motion.button
                 id={`mood-option-${moodEmoji}`}
                 key={moodEmoji}
                 type="button"
                 disabled={savingMood}
                 onClick={() => handleSetMood(moodEmoji)}
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all cursor-pointer disabled:opacity-50 ${
-                  myMood?.emoji === moodEmoji
-                    ? "bg-natural-card-darker scale-110 shadow-sm border border-natural-border"
-                    : "hover:bg-natural-card"
-                }`}
+                whileHover={{ scale: 1.15, rotate: 8 }}
+                whileTap={{ scale: 0.85, rotate: -8 }}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-base transition-colors cursor-pointer disabled:opacity-50 border-2"
+                style={{
+                  backgroundColor: isSelected ? `${color}30` : "transparent",
+                  borderColor: isSelected ? color : "transparent"
+                }}
                 title={label}
               >
                 {moodEmoji}
-              </button>
-            ))}
-          </div>
+              </motion.button>
+            );
+          })}
         </div>
       </div>
 
@@ -429,7 +553,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                   id="note-textarea"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder={`Write something beautiful, encouraging, or exciting for ${session.partnerName}...`}
+                  placeholder={composerPlaceholder}
                   maxLength={500}
                   rows={4}
                   className="w-full bg-natural-card border border-natural-border rounded-2xl p-4 text-sm text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none resize-none placeholder:text-natural-text/40"
