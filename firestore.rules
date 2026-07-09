@@ -23,6 +23,10 @@ service cloud.firestore {
       match /dates/{dateId} {
         allow read, write: if true;
       }
+
+      match /moods/{moodId} {
+        allow read, write: if true;
+      }
     }
   }
 }

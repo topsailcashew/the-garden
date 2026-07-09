@@ -38,6 +38,14 @@ export interface DatePlan {
   createdAt: any;
 }
 
+export interface MoodEntry {
+  id: string; // `${role}_${YYYY-MM-DD}`
+  role: "boy" | "girl";
+  date: string; // YYYY-MM-DD
+  emoji: string;
+  updatedAt: any;
+}
+
 export interface UserSession {
   role: "boy" | "girl";
   name: string;

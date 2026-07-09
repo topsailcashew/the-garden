@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, writeBatch, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { Note, UserSession } from "../types";
+import { Note, MoodEntry, UserSession } from "../types";
 import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame } from "lucide-react";
 
 interface LoveNotesProps {
   session: UserSession;
 }
+
+const moodOptions = ["😊", "😍", "😴", "😢", "😡", "😌", "🥳", "😰", "🤒", "😎"];
 
 export default function LoveNotes({ session }: LoveNotesProps) {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -16,6 +18,12 @@ export default function LoveNotes({ session }: LoveNotesProps) {
   const [emoji, setEmoji] = useState<string>("💌");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+
+  const [myMood, setMyMood] = useState<MoodEntry | null>(null);
+  const [partnerMood, setPartnerMood] = useState<MoodEntry | null>(null);
+  const [savingMood, setSavingMood] = useState<boolean>(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const partnerRole = session.role === "boy" ? "girl" : "boy";
 
   // Paper options with styling classes
   const paperStyles = {
@@ -62,6 +70,42 @@ export default function LoveNotes({ session }: LoveNotesProps) {
 
     return () => unsubscribe();
   }, [session.roomId]);
+
+  useEffect(() => {
+    // Real-time subscription to today's mood check-ins for both partners
+    const myMoodRef = doc(db, "rooms", session.roomId, "moods", `${session.role}_${today}`);
+    const partnerMoodRef = doc(db, "rooms", session.roomId, "moods", `${partnerRole}_${today}`);
+
+    const unsubMine = onSnapshot(myMoodRef, (snap) => {
+      setMyMood(snap.exists() ? ({ id: snap.id, ...snap.data() } as MoodEntry) : null);
+    });
+    const unsubPartner = onSnapshot(partnerMoodRef, (snap) => {
+      setPartnerMood(snap.exists() ? ({ id: snap.id, ...snap.data() } as MoodEntry) : null);
+    });
+
+    return () => {
+      unsubMine();
+      unsubPartner();
+    };
+  }, [session.roomId, session.role, partnerRole, today]);
+
+  const handleSetMood = async (selectedEmoji: string) => {
+    setSavingMood(true);
+    try {
+      const moodRef = doc(db, "rooms", session.roomId, "moods", `${session.role}_${today}`);
+      const newMood: Omit<MoodEntry, "id"> = {
+        role: session.role,
+        date: today,
+        emoji: selectedEmoji,
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(moodRef, newMood, { merge: true });
+    } catch (err) {
+      console.error("Error setting mood:", err);
+    } finally {
+      setSavingMood(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +184,45 @@ export default function LoveNotes({ session }: LoveNotesProps) {
 
   return (
     <div id="love-notes-root" className="space-y-6">
+      {/* Daily Mood Tracker */}
+      <div id="mood-tracker" className="bg-white border border-natural-border rounded-[32px] p-5 card-shadow textured-bg animate-fade-in">
+        <h3 className="font-serif text-sm text-natural-text mb-3 flex items-center gap-2 italic font-light">
+          <Smile className="w-4 h-4 text-natural-terracotta" /> Today's Mood
+        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-5">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-2xl leading-none" title="Your mood today">{myMood?.emoji || "➖"}</span>
+              <span className="text-[10px] font-bold text-natural-text/50 uppercase">You</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-2xl leading-none" title={`${session.partnerName}'s mood today`}>{partnerMood?.emoji || "➖"}</span>
+              <span className="text-[10px] font-bold text-natural-text/50 uppercase">{session.partnerName}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {moodOptions.map((m) => (
+              <button
+                id={`mood-option-${m}`}
+                key={m}
+                type="button"
+                disabled={savingMood}
+                onClick={() => handleSetMood(m)}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all cursor-pointer disabled:opacity-50 ${
+                  myMood?.emoji === m
+                    ? "bg-natural-card-darker scale-110 shadow-sm border border-natural-border"
+                    : "hover:bg-natural-card"
+                }`}
+                title={`Set mood to ${m}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Header and Mark All Read */}
       <div className="flex flex-wrap justify-between items-center gap-4 animate-fade-in">
         <div>

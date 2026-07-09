@@ -54,6 +54,18 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Time the date plan was created" }
       },
       "required": ["title", "date", "cost", "prepare", "status", "proposedBy"]
+    },
+    "Mood": {
+      "title": "Mood",
+      "description": "A daily mood check-in emoji left by one partner",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["boy", "girl"], "description": "Who logged this mood" },
+        "date": { "type": "string", "format": "date", "description": "Calendar day the mood applies to (YYYY-MM-DD)" },
+        "emoji": { "type": "string", "description": "Emoji representing the current mood" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Time the mood was last set" }
+      },
+      "required": ["role", "date", "emoji"]
     }
   },
   "firestore": {
@@ -72,6 +84,10 @@
     "/rooms/{roomId}/dates/{dateId}": {
       "schema": "DatePlan",
       "description": "Timeline of planned dates"
+    },
+    "/rooms/{roomId}/moods/{moodId}": {
+      "schema": "Mood",
+      "description": "Daily mood check-ins per partner, one doc per role per day"
     }
   }
 }

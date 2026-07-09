@@ -31,6 +31,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [now, setNow] = useState<Date>(new Date());
 
   // New Date form fields
   const [title, setTitle] = useState<string>("");
@@ -54,6 +55,12 @@ export default function DatePlanner({ session }: DatePlannerProps) {
 
     return () => unsubscribe();
   }, [session.roomId]);
+
+  useEffect(() => {
+    // Tick every second so the countdown timer stays live
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleProposeDate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,13 +143,60 @@ export default function DatePlanner({ session }: DatePlannerProps) {
   };
 
   // Divide dates into Confirmed (Upcoming), Proposed (Awaiting RSVPs), and Past (Completed)
-  const confirmedDates = dates.filter((d) => d.status === "confirmed" && new Date(d.date) >= new Date());
+  const confirmedDates = dates.filter((d) => d.status === "confirmed" && new Date(d.date) >= now);
   const proposedDates = dates.filter((d) => d.status === "proposed");
-  const completedOrPastDates = dates.filter((d) => d.status === "completed" || (d.status === "confirmed" && new Date(d.date) < new Date()));
+  const completedOrPastDates = dates.filter((d) => d.status === "completed" || (d.status === "confirmed" && new Date(d.date) < now));
   const declinedDates = dates.filter((d) => d.status === "declined");
+
+  // Countdown to the soonest confirmed, upcoming date
+  const nextDate = confirmedDates[0];
+  let countdown: { days: number; hours: number; minutes: number; seconds: number } | null = null;
+  if (nextDate) {
+    const diff = Math.max(0, new Date(nextDate.date).getTime() - now.getTime());
+    countdown = {
+      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+      hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+      minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+      seconds: Math.floor((diff % (1000 * 60)) / 1000)
+    };
+  }
 
   return (
     <div id="date-planner-root" className="space-y-6">
+      {/* Countdown to Next Scheduled Date */}
+      <div id="date-countdown-timer" className="bg-natural-olive text-white rounded-[32px] p-6 card-shadow textured-bg animate-fade-in">
+        {countdown && nextDate ? (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/70">Counting down to</p>
+              <h3 className="font-serif text-lg italic font-light mt-0.5">{nextDate.title}</h3>
+            </div>
+            <div className="flex items-center gap-3 sm:gap-5">
+              {[
+                { label: "Days", value: countdown.days },
+                { label: "Hrs", value: countdown.hours },
+                { label: "Min", value: countdown.minutes },
+                { label: "Sec", value: countdown.seconds }
+              ].map((unit) => (
+                <div key={unit.label} className="flex flex-col items-center min-w-[44px]">
+                  <span className="text-2xl sm:text-3xl font-serif font-semibold tabular-nums">
+                    {String(unit.value).padStart(2, "0")}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wider text-white/70">{unit.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-white/80 flex-shrink-0" />
+            <p className="text-sm font-serif italic font-light">
+              No upcoming date locked in yet. Propose or accept an invitation to start the countdown!
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center gap-4 animate-fade-in">
         <div>

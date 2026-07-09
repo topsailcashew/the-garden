@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-courtshipjournal-5c5f10ff-7592-4e25-a368-e6c026b00ec8",
+      "rules": "firestore.rules"
+    }
+  ]
+}
