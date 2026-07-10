@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
-import { UserSession } from "./types";
+import { Room, UserSession } from "./types";
 import Onboarding from "./components/Onboarding";
 import LoveNotes from "./components/LoveNotes";
 import DailyQuest from "./components/DailyQuest";
@@ -10,13 +10,15 @@ import { useConfirm } from "./components/ConfirmDialog";
 import { useToast } from "./components/Toast";
 import { Heart, Mail, Sparkles, Calendar, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
 
+const avatarOptions = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "🤴", "👸", "🦊", "🐻", "🐰", "🌻", "🌙"];
+
 export default function App() {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [session, setSession] = useState<UserSession | null>(null);
   const [activeTab, setActiveTab] = useState<"notes" | "quest" | "dates">("notes");
   const [copied, setCopied] = useState<boolean>(false);
-  const [roomCreatedAt, setRoomCreatedAt] = useState<string | null>(null);
+  const [roomMeta, setRoomMeta] = useState<Partial<Room> | null>(null);
   const [codeRevealed, setCodeRevealed] = useState<boolean>(false);
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
@@ -36,24 +38,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Pull the room's real creation date so the footer's "Est." date
-    // reflects reality instead of a hardcoded placeholder.
+    // Live subscription to the room doc so avatars, display names, and the
+    // footer's "Est." date stay in sync when either partner changes them.
     if (!session) return;
-    const fetchRoomMeta = async () => {
-      try {
-        const roomRef = doc(db, "rooms", session.roomId);
-        const roomSnap = await getDoc(roomRef);
-        if (roomSnap.exists()) {
-          const data = roomSnap.data();
-          if (typeof data.createdAt === "string") {
-            setRoomCreatedAt(data.createdAt);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching room metadata:", err);
-      }
-    };
-    fetchRoomMeta();
+    const roomRef = doc(db, "rooms", session.roomId);
+    const unsubscribe = onSnapshot(
+      roomRef,
+      (snap) => {
+        if (snap.exists()) setRoomMeta(snap.data() as Partial<Room>);
+      },
+      (err) => console.error("Error syncing room metadata:", err)
+    );
+    return () => unsubscribe();
   }, [session]);
 
   const handleOnboardingComplete = (newSession: UserSession) => {
@@ -118,9 +114,27 @@ export default function App() {
     }
   };
 
+  const handleSetAvatar = async (avatar: string) => {
+    if (!session) return;
+    try {
+      const roomRef = doc(db, "rooms", session.roomId);
+      const field = session.role === "boy" ? "boyAvatar" : "girlAvatar";
+      await setDoc(roomRef, { [field]: avatar }, { merge: true });
+      showToast("Avatar updated!", "success");
+    } catch (err) {
+      console.error("Error updating avatar:", err);
+      showToast("Failed to update your avatar. Please try again.");
+    }
+  };
+
   if (!session) {
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
+
+  const boyAvatar = roomMeta?.boyAvatar || "🧑";
+  const girlAvatar = roomMeta?.girlAvatar || "👩";
+  const myAvatar = session.role === "boy" ? boyAvatar : girlAvatar;
+  const roomCreatedAt = typeof roomMeta?.createdAt === "string" ? roomMeta.createdAt : null;
 
   return (
     <div id="app-root" className="min-h-screen bg-natural-bg text-natural-text font-sans relative flex flex-col justify-between">
@@ -148,7 +162,7 @@ export default function App() {
                 onClick={handleOpenProfileMenu}
                 className="flex items-center gap-1.5 bg-natural-card-darker hover:bg-natural-border/60 border border-natural-border px-3 py-1.5 rounded-full text-xs font-semibold text-natural-text transition-all cursor-pointer"
               >
-                <span className="text-sm">{session.role === "boy" ? "🧑" : "👩"}</span>
+                <span className="text-sm">{myAvatar}</span>
                 <span className="hidden sm:inline">Hello, {session.name}</span>
                 <ChevronDown className={`w-3 h-3 text-natural-text/50 transition-transform ${showProfileMenu ? "rotate-180" : ""}`} />
               </button>
@@ -204,6 +218,27 @@ export default function App() {
                     <p className="text-[11px] text-natural-text/50 py-1.5">
                       Sharing this garden with <strong className="text-natural-text/70">{session.partnerName}</strong>
                     </p>
+
+                    <div className="border-t border-natural-border mt-2 pt-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-natural-text/40 mb-1.5">Your Avatar</p>
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {avatarOptions.map((a) => (
+                          <button
+                            id={`avatar-option-${a}`}
+                            key={a}
+                            onClick={() => handleSetAvatar(a)}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all cursor-pointer ${
+                              myAvatar === a
+                                ? "bg-natural-card-darker scale-110 border border-natural-border shadow-sm"
+                                : "hover:bg-natural-card"
+                            }`}
+                            title={`Use ${a} as your avatar`}
+                          >
+                            {a}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
                     <div className="border-t border-natural-border mt-2 pt-3">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-natural-text/40 mb-1.5">Room Code</p>
@@ -295,7 +330,7 @@ export default function App() {
 
         {/* Tab Content Panel */}
         <div className="min-h-[400px]">
-          {activeTab === "notes" && <LoveNotes session={session} />}
+          {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
           {activeTab === "quest" && <DailyQuest session={session} />}
           {activeTab === "dates" && <DatePlanner session={session} />}
         </div>

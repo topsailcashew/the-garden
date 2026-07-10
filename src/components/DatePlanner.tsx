@@ -244,7 +244,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
         <div>
           <h2 className="text-2xl font-serif font-light text-natural-text flex items-center gap-2">
             <Calendar className="w-6 h-6 text-natural-terracotta" />
-            Courtship Date Planner
+            Date Planner
           </h2>
           <p className="text-xs text-natural-text/60 mt-1">
             Propose magical dates, sync budgets and preparations, and RSVP to your partner's invitations in real-time.

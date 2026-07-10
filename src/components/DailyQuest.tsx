@@ -107,6 +107,21 @@ export default function DailyQuest({ session }: DailyQuestProps) {
   const myAnswer = session.role === "boy" ? todayQuestion.boyAnswer : todayQuestion.girlAnswer;
   const partnerAnswer = session.role === "boy" ? todayQuestion.girlAnswer : todayQuestion.boyAnswer;
 
+  const myReaction = session.role === "boy" ? todayQuestion.boyReaction : todayQuestion.girlReaction;
+  const partnerReaction = session.role === "boy" ? todayQuestion.girlReaction : todayQuestion.boyReaction;
+
+  const handleReactToQuestion = async (reaction: string) => {
+    try {
+      const qRef = doc(db, "rooms", session.roomId, "questions", todayId);
+      const field = session.role === "boy" ? "boyReaction" : "girlReaction";
+      // Tapping your active reaction again clears it
+      await updateDoc(qRef, { [field]: myReaction === reaction ? "" : reaction });
+    } catch (err) {
+      console.error("Error reacting to question:", err);
+      setError("Failed to save your reaction. Please try again.");
+    }
+  };
+
   const handleSendAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!answerInput.trim()) return;
@@ -206,7 +221,7 @@ export default function DailyQuest({ session }: DailyQuestProps) {
         <div>
           <h2 className="text-2xl font-serif font-light text-natural-text flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-natural-terracotta" />
-            Daily Courtship Quest
+            Daily Quest
           </h2>
           <p className="text-xs text-natural-text/60 mt-1">
             Answer today's question first to unlock {session.partnerName}'s hidden response. Discover something beautiful!
@@ -268,6 +283,32 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                 <span className="flex items-center gap-1 bg-natural-card text-natural-olive font-serif font-medium px-2.5 py-0.5 rounded-full text-[10px] border border-natural-border">
                   {hasBoyAnswered && hasGirlAnswered ? "✨ Quest Complete" : "⏳ Active Quest"}
                 </span>
+              </div>
+
+              {/* Emoji reactions to the question itself */}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-1 bg-natural-card border border-natural-border rounded-full p-1" title="React to today's question">
+                  {["❤️", "😂", "😮", "💭", "🔥"].map((reaction) => (
+                    <button
+                      id={`quest-react-${reaction}`}
+                      key={reaction}
+                      type="button"
+                      onClick={() => handleReactToQuestion(reaction)}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all active:scale-125 cursor-pointer hover:scale-110 ${
+                        myReaction === reaction ? "bg-natural-card-darker border border-natural-border shadow-inner" : "hover:bg-black/5"
+                      }`}
+                      title={`React with ${reaction}`}
+                    >
+                      {reaction}
+                    </button>
+                  ))}
+                </div>
+
+                {partnerReaction && (
+                  <span id="quest-partner-reaction" className="text-[10px] text-natural-text/60 font-serif italic flex items-center gap-1 bg-natural-card border border-natural-border rounded-full px-2.5 py-1">
+                    {session.partnerName} reacted <span className="text-sm not-italic">{partnerReaction}</span>
+                  </span>
+                )}
               </div>
             </motion.div>
 
@@ -381,7 +422,17 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                 </div>
               </div>
 
-              {!isCustomMode ? (
+              {hasBoyAnswered || hasGirlAnswered ? (
+                /* Once anyone has answered, the question is locked in for the
+                   day — no swapping it out from under an existing answer. */
+                <div className="pt-1 flex items-start gap-2.5 bg-natural-card border border-natural-border rounded-xl p-3.5">
+                  <span className="text-base leading-none">🔏</span>
+                  <p id="quest-locked-message" className="text-xs text-natural-text/70 leading-relaxed">
+                    Today's question is locked in — {hasIAnswered && !hasPartnerAnswered ? "you've" : hasPartnerAnswered && !hasIAnswered ? `${session.partnerName} has` : "you've both"} already answered it.
+                    A fresh question (and the chance to write your own) arrives tomorrow!
+                  </p>
+                </div>
+              ) : !isCustomMode ? (
                 <div className="space-y-3 pt-1">
                   <p className="text-xs text-natural-text/75 leading-relaxed">
                     Don't feel today's default question? You can overwrite it and ask {session.partnerName} a custom, highly personal question instead!

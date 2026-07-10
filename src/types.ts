@@ -4,6 +4,8 @@ export interface Room {
   girlName: string;
   passcode: string;
   createdAt: any; // Firestore Timestamp or ISO string
+  boyAvatar?: string; // Emoji avatar chosen by the boy
+  girlAvatar?: string; // Emoji avatar chosen by the girl
 }
 
 export interface Note {
@@ -13,7 +15,8 @@ export interface Note {
   createdAt: any;
   read: boolean;
   paperType: "letter" | "sticky" | "parchment" | "rose" | "indigo";
-  emoji?: string; // Reaction
+  emoji?: string; // Original wax seal chosen by the sender, set at creation
+  reactionEmoji?: string; // Recipient's reaction seal, stacked alongside the original
   imageUrl?: string; // Attached photo, if any
 }
 
@@ -24,6 +27,8 @@ export interface Question {
   girlAnswer?: string;
   boyAnsweredAt?: any;
   girlAnsweredAt?: any;
+  boyReaction?: string; // Emoji reaction to today's question
+  girlReaction?: string;
 }
 
 export interface DatePlan {

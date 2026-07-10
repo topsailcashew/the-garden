@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import { Note, MoodEntry, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
-import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search } from "lucide-react";
+import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check } from "lucide-react";
 
 const NOTES_PAGE_SIZE = 30;
 
@@ -65,6 +65,7 @@ const compressImage = (file: File): Promise<string> => {
 
 interface LoveNotesProps {
   session: UserSession;
+  avatars?: { boy: string; girl: string };
 }
 
 interface MoodOption {
@@ -150,7 +151,7 @@ const moodOptions: MoodOption[] = [
 
 const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === emoji);
 
-export default function LoveNotes({ session }: LoveNotesProps) {
+export default function LoveNotes({ session, avatars }: LoveNotesProps) {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [notes, setNotes] = useState<Note[]>([]);
@@ -161,6 +162,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
   const [emoji, setEmoji] = useState<string>("💌");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [isComposerOpen, setIsComposerOpen] = useState<boolean>(false);
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
@@ -178,7 +180,10 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     showToast(`Couldn't sync ${context}. Check your connection or try reloading.`);
   };
 
-  // Paper options with styling classes
+  // Paper options with styling classes. Each style pairs a paper color with a
+  // distinct typeface so the picker/preview shows exactly how the note reads:
+  // rose = elegant love-letter serif, indigo = clean modern sans,
+  // sticky = casual handwriting, parchment = vintage typewriter.
   const paperStyles = {
     rose: {
       bg: "bg-[#FAF6F0] border-natural-border text-natural-text card-shadow font-serif italic",
@@ -187,19 +192,19 @@ export default function LoveNotes({ session }: LoveNotesProps) {
       badge: "border-natural-border text-natural-terracotta bg-natural-card-darker/50"
     },
     indigo: {
-      bg: "bg-[#F5F5F0] border-natural-border text-natural-text card-shadow",
+      bg: "bg-[#F5F5F0] border-natural-border text-natural-text card-shadow font-sans",
       accent: "bg-natural-card-darker text-natural-text",
       seal: "bg-natural-olive text-white shadow-sm",
       badge: "border-natural-border text-natural-olive bg-natural-card-darker/50"
     },
     sticky: {
-      bg: "bg-[#FAF7E8] border-natural-border text-natural-text card-shadow",
+      bg: "bg-[#FAF7E8] border-natural-border text-natural-text card-shadow font-hand",
       accent: "bg-natural-card-darker text-natural-text",
       seal: "bg-natural-green text-white shadow-sm",
       badge: "border-natural-border text-natural-green bg-natural-card-darker/50"
     },
     parchment: {
-      bg: "bg-[#FAF3E8] border-natural-border text-natural-text card-shadow font-serif",
+      bg: "bg-[#FAF3E8] border-natural-border text-natural-text card-shadow font-type",
       accent: "bg-natural-card-darker text-natural-text",
       seal: "bg-natural-terracotta text-white shadow-sm",
       badge: "border-natural-border text-natural-terracotta bg-natural-card-darker/50"
@@ -333,6 +338,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
       setContent("");
       setEmoji("💌");
       handleRemoveImage();
+      setIsComposerOpen(false);
     } catch (err: any) {
       console.error(err);
       setError("Failed to leave your note. Try again!");
@@ -354,10 +360,12 @@ export default function LoveNotes({ session }: LoveNotesProps) {
     }
   };
 
-  const handleReactToNote = async (noteId: string, newEmoji: string) => {
+  const handleReactToNote = async (noteId: string, newEmoji: string, currentReaction?: string) => {
     try {
       const noteRef = doc(db, "rooms", session.roomId, "notes", noteId);
-      await updateDoc(noteRef, { emoji: newEmoji });
+      // Tapping the already-active reaction again removes it; the original
+      // sender's seal is never touched, so both stay stacked independently.
+      await updateDoc(noteRef, { reactionEmoji: currentReaction === newEmoji ? "" : newEmoji });
     } catch (err) {
       console.error("Error reacting to note:", err);
       showToast("Failed to save your reaction. Please try again.");
@@ -420,6 +428,9 @@ export default function LoveNotes({ session }: LoveNotesProps) {
   const composerPlaceholder = partnerMoodOption
     ? partnerMoodOption.suggestion(session.partnerName, partnerPronoun)
     : `Write something beautiful, encouraging, or exciting for ${session.partnerName}...`;
+
+  const myAvatar = session.role === "boy" ? avatars?.boy || "🧑" : avatars?.girl || "👩";
+  const partnerAvatar = partnerRole === "boy" ? avatars?.boy || "🧑" : avatars?.girl || "👩";
 
   return (
     <div id="love-notes-root" className="space-y-6">
@@ -529,22 +540,61 @@ export default function LoveNotes({ session }: LoveNotesProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Note Editor Sidepanel */}
-        <div className="lg:col-span-1">
-          <div className="bg-white border border-natural-border rounded-[32px] p-6 card-shadow sticky top-6 textured-bg">
-            <h3 className="font-serif text-lg text-natural-text mb-4 flex items-center gap-2 italic font-light">
-              <PenTool className="w-4 h-4 text-natural-terracotta" />
-              Write to {session.partnerName}
-            </h3>
+      {/* Floating "write a note" button, bottom-right */}
+      <motion.button
+        id="btn-open-composer"
+        onClick={() => {
+          setError("");
+          setIsComposerOpen(true);
+        }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.92 }}
+        className="fixed bottom-6 right-6 z-50 bg-natural-olive hover:bg-natural-olive-hover text-white rounded-full shadow-lg py-3.5 px-5 flex items-center gap-2 font-serif italic text-sm cursor-pointer"
+      >
+        <PenTool className="w-4 h-4" /> Write a Note
+      </motion.button>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 text-red-700 text-xs rounded-xl text-center">
-                {error}
+      {/* Composer modal */}
+      <AnimatePresence>
+        {isComposerOpen && (
+          <motion.div
+            id="composer-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsComposerOpen(false)}
+            className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"
+          >
+            <motion.div
+              id="composer-panel"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white border border-natural-border rounded-[32px] p-6 card-shadow textured-bg w-full max-w-md max-h-[88vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-serif text-lg text-natural-text flex items-center gap-2 italic font-light">
+                  <PenTool className="w-4 h-4 text-natural-terracotta" />
+                  Write to {session.partnerName}
+                </h3>
+                <button
+                  id="btn-close-composer"
+                  onClick={() => setIsComposerOpen(false)}
+                  className="p-1.5 text-natural-text/50 hover:text-natural-text hover:bg-natural-card rounded-full cursor-pointer transition-all"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 text-xs rounded-xl text-center">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1">
                   Message{imagePreview ? " (optional caption)" : ""}
@@ -605,23 +655,30 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                 )}
               </div>
 
-              {/* Paper selector */}
+              {/* Paper selector: each swatch renders in the actual paper
+                  background and typeface the finished note will use */}
               <div>
                 <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1.5">Paper Style</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(paperStyles) as Note["paperType"][]).map((type) => (
                     <button
                       id={`paper-style-${type}`}
                       key={type}
                       type="button"
                       onClick={() => setPaperType(type)}
-                      className={`py-2 text-[11px] font-medium font-serif italic rounded-xl border capitalize transition-all cursor-pointer ${
+                      className={`relative rounded-xl border-2 px-3 pt-2 pb-1.5 text-left transition-all cursor-pointer overflow-hidden ${paperStyles[type].bg} ${
                         paperType === type
-                          ? "border-natural-olive bg-natural-card text-natural-olive font-bold"
-                          : "border-natural-border bg-white text-natural-text hover:border-natural-text/30"
+                          ? "border-natural-olive shadow-sm"
+                          : "border-natural-border/60 hover:border-natural-text/30 opacity-80 hover:opacity-100"
                       }`}
                     >
-                      {type}
+                      <span className="block text-sm leading-snug">Sweet nothings...</span>
+                      <span className="block text-[9px] font-sans not-italic font-bold uppercase tracking-wider text-natural-text/40 mt-1">{type}</span>
+                      {paperType === type && (
+                        <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-natural-olive text-white rounded-full flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5" />
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -680,12 +737,14 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                   </>
                 )}
               </button>
-            </form>
-          </div>
-        </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Notes Board */}
-        <div className="lg:col-span-2">
+      {/* Notes Board */}
+      <div>
           {notes.length > 0 && (
             <div className="relative mb-4">
               <Search className="w-3.5 h-3.5 text-natural-text/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -714,7 +773,7 @@ export default function LoveNotes({ session }: LoveNotesProps) {
               </p>
             </div>
           ) : (
-            <div className="columns-1 sm:columns-2 xl:columns-3 gap-4">
+            <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
               <AnimatePresence>
                 {filteredNotes.map((note) => {
                   const style = paperStyles[note.paperType] || paperStyles.rose;
@@ -733,10 +792,19 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                         style.bg
                       } ${isLocked ? "cursor-pointer hover:shadow-md hover:scale-[1.01]" : ""}`}
                     >
-                      {/* Note Header */}
+                      {/* Note Header: avatar + name badge, color-coded per sender so
+                          it's obvious at a glance who left each note */}
                       <div className="flex justify-between items-start mb-3">
-                        <span className={`text-[10px] font-bold py-0.5 px-2 rounded-full border ${style.badge}`}>
-                          {isOwn ? "Left by You" : `From ${session.partnerName}`}
+                        <span
+                          className={`text-[10px] font-bold py-0.5 pl-1 pr-2 rounded-full border flex items-center gap-1 not-italic ${
+                            isOwn
+                              ? "bg-natural-olive/10 border-natural-olive/40 text-natural-olive"
+                              : "bg-natural-terracotta/10 border-natural-terracotta/40 text-natural-terracotta"
+                          }`}
+                          title={isOwn ? "You wrote this note" : `${session.partnerName} wrote this note`}
+                        >
+                          <span className="text-sm leading-none">{isOwn ? myAvatar : partnerAvatar}</span>
+                          {isOwn ? "You" : session.partnerName}
                         </span>
                         
                         <div className="flex items-center gap-2">
@@ -790,10 +858,18 @@ export default function LoveNotes({ session }: LoveNotesProps) {
 
                           {/* Footer with Seal Emoji & Interactive Reactions */}
                           <div className="flex justify-between items-center mt-4 pt-3 border-t border-stone-200/10">
-                            {/* Original Seal badge - distinct pill so it doesn't read as another reaction option */}
+                            {/* Seal stack: the sender's original seal stays put; the
+                                recipient's reaction stacks partially on top of it */}
                             <div className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] rounded-full pl-1.5 pr-2.5 py-1">
-                              <span className="text-sm">{note.emoji || "💌"}</span>
-                              <span className="text-[9px] font-bold uppercase tracking-wide text-stone-400">Seal</span>
+                              <div className="flex items-center">
+                                <span className="text-sm">{note.emoji || "💌"}</span>
+                                {note.reactionEmoji && (
+                                  <span className="text-sm -ml-1.5 drop-shadow-sm" title="Reaction seal">{note.reactionEmoji}</span>
+                                )}
+                              </div>
+                              <span className="text-[9px] font-bold uppercase tracking-wide text-stone-400">
+                                {note.reactionEmoji ? "Seals" : "Seal"}
+                              </span>
                             </div>
 
                             {/* Easy Reaction Buttons, grouped in their own pill so they read as a separate control */}
@@ -804,10 +880,10 @@ export default function LoveNotes({ session }: LoveNotesProps) {
                                   key={reaction}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleReactToNote(note.id, reaction);
+                                    handleReactToNote(note.id, reaction, note.reactionEmoji);
                                   }}
                                   className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all active:scale-125 cursor-pointer hover:scale-110 ${
-                                    note.emoji === reaction ? "bg-stone-200/70 border border-stone-300 shadow-inner" : "hover:bg-black/5"
+                                    note.reactionEmoji === reaction ? "bg-stone-200/70 border border-stone-300 shadow-inner" : "hover:bg-black/5"
                                   }`}
                                   title={`React with ${reaction}`}
                                 >
@@ -841,7 +917,6 @@ export default function LoveNotes({ session }: LoveNotesProps) {
               </button>
             </div>
           )}
-        </div>
       </div>
     </div>
   );

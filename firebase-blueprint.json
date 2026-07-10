@@ -8,7 +8,9 @@
         "boyName": { "type": "string", "description": "The boy's name" },
         "girlName": { "type": "string", "description": "The girl's name" },
         "passcode": { "type": "string", "description": "Shared passcode" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "boyAvatar": { "type": "string", "description": "Emoji avatar chosen by the boy" },
+        "girlAvatar": { "type": "string", "description": "Emoji avatar chosen by the girl" }
       },
       "required": ["boyName", "girlName", "passcode"]
     },
@@ -22,7 +24,8 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Time the note was left" },
         "read": { "type": "boolean", "description": "Whether the note has been opened" },
         "paperType": { "type": "string", "enum": ["letter", "sticky", "parchment"], "description": "Visual style of the note" },
-        "emoji": { "type": "string", "description": "Sticker/seal emoji" },
+        "emoji": { "type": "string", "description": "Original wax seal emoji chosen by the sender" },
+        "reactionEmoji": { "type": "string", "description": "Recipient's reaction seal, displayed stacked with the original" },
         "imageUrl": { "type": "string", "description": "Attached photo, compressed client-side and stored as a base64 data URI (kept under Firestore's 1MB document limit)" }
       },
       "required": ["sender", "content", "createdAt", "read"]
@@ -36,7 +39,9 @@
         "boyAnswer": { "type": "string", "description": "The boy's answer" },
         "girlAnswer": { "type": "string", "description": "The girl's answer" },
         "boyAnsweredAt": { "type": "string", "format": "date-time", "description": "Time the boy answered" },
-        "girlAnsweredAt": { "type": "string", "format": "date-time", "description": "Time the girl answered" }
+        "girlAnsweredAt": { "type": "string", "format": "date-time", "description": "Time the girl answered" },
+        "boyReaction": { "type": "string", "description": "The boy's emoji reaction to the question" },
+        "girlReaction": { "type": "string", "description": "The girl's emoji reaction to the question" }
       },
       "required": ["questionText"]
     },
