@@ -107,17 +107,21 @@ export default function DailyQuest({ session }: DailyQuestProps) {
   const myAnswer = session.role === "boy" ? todayQuestion.boyAnswer : todayQuestion.girlAnswer;
   const partnerAnswer = session.role === "boy" ? todayQuestion.girlAnswer : todayQuestion.boyAnswer;
 
-  const myReaction = session.role === "boy" ? todayQuestion.boyReaction : todayQuestion.girlReaction;
-  const partnerReaction = session.role === "boy" ? todayQuestion.girlReaction : todayQuestion.boyReaction;
+  // Reactions live on the answers, not the question. The reaction on MY answer
+  // was left by my partner (read-only to me); the reaction I give lands on my
+  // partner's answer.
+  const reactionOnMyAnswer = session.role === "boy" ? todayQuestion.boyAnswerReaction : todayQuestion.girlAnswerReaction;
+  const myReactionToPartner = session.role === "boy" ? todayQuestion.girlAnswerReaction : todayQuestion.boyAnswerReaction;
 
-  const handleReactToQuestion = async (reaction: string) => {
+  const handleReactToAnswer = async (reaction: string) => {
     try {
       const qRef = doc(db, "rooms", session.roomId, "questions", todayId);
-      const field = session.role === "boy" ? "boyReaction" : "girlReaction";
+      // My reaction is stored on my partner's answer field.
+      const field = session.role === "boy" ? "girlAnswerReaction" : "boyAnswerReaction";
       // Tapping your active reaction again clears it
-      await updateDoc(qRef, { [field]: myReaction === reaction ? "" : reaction });
+      await updateDoc(qRef, { [field]: myReactionToPartner === reaction ? "" : reaction });
     } catch (err) {
-      console.error("Error reacting to question:", err);
+      console.error("Error reacting to answer:", err);
       setError("Failed to save your reaction. Please try again.");
     }
   };
@@ -252,8 +256,9 @@ export default function DailyQuest({ session }: DailyQuestProps) {
 
       {activeTab === "today" ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Main Quest Box */}
-          <div className="lg:col-span-8 space-y-6">
+          {/* Main Quest Box — grows to full width once the quest options panel
+              disappears (i.e. after either partner has answered). */}
+          <div className={`${hasBoyAnswered || hasGirlAnswered ? "lg:col-span-12" : "lg:col-span-8"} space-y-6`}>
             {error && (
               <div className="p-3 bg-red-50 border border-red-100 text-red-700 text-xs rounded-xl text-center">
                 {error}
@@ -284,32 +289,6 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                   {hasBoyAnswered && hasGirlAnswered ? "✨ Quest Complete" : "⏳ Active Quest"}
                 </span>
               </div>
-
-              {/* Emoji reactions to the question itself */}
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1 bg-natural-card border border-natural-border rounded-full p-1" title="React to today's question">
-                  {["❤️", "😂", "😮", "💭", "🔥"].map((reaction) => (
-                    <button
-                      id={`quest-react-${reaction}`}
-                      key={reaction}
-                      type="button"
-                      onClick={() => handleReactToQuestion(reaction)}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all active:scale-125 cursor-pointer hover:scale-110 ${
-                        myReaction === reaction ? "bg-natural-card-darker border border-natural-border shadow-inner" : "hover:bg-black/5"
-                      }`}
-                      title={`React with ${reaction}`}
-                    >
-                      {reaction}
-                    </button>
-                  ))}
-                </div>
-
-                {partnerReaction && (
-                  <span id="quest-partner-reaction" className="text-[10px] text-natural-text/60 font-serif italic flex items-center gap-1 bg-natural-card border border-natural-border rounded-full px-2.5 py-1">
-                    {session.partnerName} reacted <span className="text-sm not-italic">{partnerReaction}</span>
-                  </span>
-                )}
-              </div>
             </motion.div>
 
             {/* Answer Board */}
@@ -329,9 +308,17 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                   </div>
 
                   {hasIAnswered ? (
-                    <div className="bg-natural-card rounded-xl p-4 text-sm text-natural-text leading-relaxed font-serif italic min-h-[100px] border border-natural-border relative">
-                      <span className="text-3xl font-serif absolute top-1 right-2 text-natural-text/10">”</span>
-                      "{myAnswer}"
+                    <div>
+                      <div className="bg-natural-card rounded-xl p-4 text-sm text-natural-text leading-relaxed font-serif italic min-h-[100px] border border-natural-border relative">
+                        <span className="text-3xl font-serif absolute top-1 right-2 text-natural-text/10">”</span>
+                        "{myAnswer}"
+                      </div>
+                      {reactionOnMyAnswer && (
+                        <div id="my-answer-reaction" className="mt-2 flex items-center gap-1.5 text-[10px] text-natural-text/60 font-serif italic">
+                          <span className="text-base not-italic">{reactionOnMyAnswer}</span>
+                          {session.partnerName} reacted to your answer
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <form onSubmit={handleSendAnswer} className="space-y-3">
@@ -399,9 +386,29 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                     </div>
                   ) : (
                     // Revealed state: Both answered
-                    <div className="bg-natural-card-darker rounded-xl p-4 text-sm text-natural-text leading-relaxed font-serif italic min-h-[100px] border border-natural-border relative">
-                      <span className="text-3xl font-serif absolute top-1 right-2 text-natural-text/10">”</span>
-                      "{partnerAnswer}"
+                    <div>
+                      <div className="bg-natural-card-darker rounded-xl p-4 text-sm text-natural-text leading-relaxed font-serif italic min-h-[100px] border border-natural-border relative">
+                        <span className="text-3xl font-serif absolute top-1 right-2 text-natural-text/10">”</span>
+                        "{partnerAnswer}"
+                      </div>
+
+                      {/* React to your partner's answer */}
+                      <div className="mt-2.5 flex items-center gap-1 bg-natural-card border border-natural-border rounded-full p-1 w-fit" title={`React to ${session.partnerName}'s answer`}>
+                        {["❤️", "😂", "🥹", "😮", "🔥"].map((reaction) => (
+                          <button
+                            id={`answer-react-${reaction}`}
+                            key={reaction}
+                            type="button"
+                            onClick={() => handleReactToAnswer(reaction)}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all active:scale-125 cursor-pointer hover:scale-110 ${
+                              myReactionToPartner === reaction ? "bg-natural-card-darker border border-natural-border shadow-inner" : "hover:bg-black/5"
+                            }`}
+                            title={`React with ${reaction}`}
+                          >
+                            {reaction}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -409,7 +416,9 @@ export default function DailyQuest({ session }: DailyQuestProps) {
             </div>
           </div>
 
-          {/* Side Panel: Create Custom Quest */}
+          {/* Side Panel: Create Custom Quest — only available until someone
+              answers, after which it disappears entirely. */}
+          {!(hasBoyAnswered || hasGirlAnswered) && (
           <div className="lg:col-span-4 animate-fade-in">
             <div className="bg-white border border-natural-border rounded-[32px] p-6 card-shadow sticky top-6 space-y-5 textured-bg">
               <div className="flex items-center gap-2 mb-1">
@@ -422,17 +431,7 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                 </div>
               </div>
 
-              {hasBoyAnswered || hasGirlAnswered ? (
-                /* Once anyone has answered, the question is locked in for the
-                   day — no swapping it out from under an existing answer. */
-                <div className="pt-1 flex items-start gap-2.5 bg-natural-card border border-natural-border rounded-xl p-3.5">
-                  <span className="text-base leading-none">🔏</span>
-                  <p id="quest-locked-message" className="text-xs text-natural-text/70 leading-relaxed">
-                    Today's question is locked in — {hasIAnswered && !hasPartnerAnswered ? "you've" : hasPartnerAnswered && !hasIAnswered ? `${session.partnerName} has` : "you've both"} already answered it.
-                    A fresh question (and the chance to write your own) arrives tomorrow!
-                  </p>
-                </div>
-              ) : !isCustomMode ? (
+              {!isCustomMode ? (
                 <div className="space-y-3 pt-1">
                   <p className="text-xs text-natural-text/75 leading-relaxed">
                     Don't feel today's default question? You can overwrite it and ask {session.partnerName} a custom, highly personal question instead!
@@ -481,6 +480,7 @@ export default function DailyQuest({ session }: DailyQuestProps) {
               )}
             </div>
           </div>
+          )}
         </div>
       ) : (
         /* History View */

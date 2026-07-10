@@ -6,6 +6,7 @@ export interface Room {
   createdAt: any; // Firestore Timestamp or ISO string
   boyAvatar?: string; // Emoji avatar chosen by the boy
   girlAvatar?: string; // Emoji avatar chosen by the girl
+  lastHug?: { sender: "boy" | "girl"; sentAt: string; nonce: string }; // Most recent virtual hug
 }
 
 export interface Note {
@@ -27,8 +28,8 @@ export interface Question {
   girlAnswer?: string;
   boyAnsweredAt?: any;
   girlAnsweredAt?: any;
-  boyReaction?: string; // Emoji reaction to today's question
-  girlReaction?: string;
+  boyAnswerReaction?: string; // Emoji reaction left on the boy's answer (by the girl)
+  girlAnswerReaction?: string; // Emoji reaction left on the girl's answer (by the boy)
 }
 
 export interface DatePlan {

@@ -66,6 +66,7 @@ const compressImage = (file: File): Promise<string> => {
 interface LoveNotesProps {
   session: UserSession;
   avatars?: { boy: string; girl: string };
+  onSendHug?: () => void;
 }
 
 interface MoodOption {
@@ -151,7 +152,7 @@ const moodOptions: MoodOption[] = [
 
 const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === emoji);
 
-export default function LoveNotes({ session, avatars }: LoveNotesProps) {
+export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProps) {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [notes, setNotes] = useState<Note[]>([]);
@@ -540,19 +541,43 @@ export default function LoveNotes({ session, avatars }: LoveNotesProps) {
         )}
       </div>
 
-      {/* Floating "write a note" button, bottom-right */}
-      <motion.button
-        id="btn-open-composer"
-        onClick={() => {
-          setError("");
-          setIsComposerOpen(true);
-        }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.92 }}
-        className="fixed bottom-6 right-6 z-50 bg-natural-olive hover:bg-natural-olive-hover text-white rounded-full shadow-lg py-3.5 px-5 flex items-center gap-2 font-serif italic text-sm cursor-pointer"
-      >
-        <PenTool className="w-4 h-4" /> Write a Note
-      </motion.button>
+      {/* Floating action cluster, bottom-right: send a hug + write a note */}
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
+        {onSendHug && (
+          <motion.button
+            id="btn-send-hug"
+            onClick={onSendHug}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.85 }}
+            className="w-14 h-14 rounded-full bg-white border border-natural-border shadow-lg flex items-center justify-center text-2xl cursor-pointer"
+            title={`Send ${session.partnerName} a virtual hug`}
+          >
+            🤗
+          </motion.button>
+        )}
+
+        <motion.button
+          id="btn-open-composer"
+          onClick={() => {
+            setError("");
+            setIsComposerOpen(true);
+          }}
+          animate={{
+            y: [0, -5, 0],
+            boxShadow: [
+              "0 8px 20px -4px rgba(90,90,64,0.35)",
+              "0 14px 28px -4px rgba(204,122,92,0.55)",
+              "0 8px 20px -4px rgba(90,90,64,0.35)"
+            ]
+          }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          whileHover={{ scale: 1.06, y: 0 }}
+          whileTap={{ scale: 0.92 }}
+          className="bg-natural-olive hover:bg-natural-olive-hover text-white rounded-full py-3.5 px-5 flex items-center gap-2 font-serif italic text-sm cursor-pointer"
+        >
+          <PenTool className="w-4 h-4" /> Write a Note
+        </motion.button>
+      </div>
 
       {/* Composer modal */}
       <AnimatePresence>

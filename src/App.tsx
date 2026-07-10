@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { Room, UserSession } from "./types";
@@ -24,6 +25,7 @@ export default function App() {
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [nameInput, setNameInput] = useState<string>("");
   const [savingName, setSavingName] = useState<boolean>(false);
+  const [activeHug, setActiveHug] = useState<{ from: string } | null>(null);
 
   useEffect(() => {
     // Check if user session exists in local storage
@@ -42,15 +44,40 @@ export default function App() {
     // footer's "Est." date stay in sync when either partner changes them.
     if (!session) return;
     const roomRef = doc(db, "rooms", session.roomId);
+    // A virtual hug is only revealed the *next time the recipient opens the app*
+    // — not live while they're already in it. So we check for an unseen hug from
+    // the partner on the first snapshot only, and remember it as seen so it
+    // never replays. Hugs that arrive while the app is open are intentionally
+    // left unseen, and will surface on the next open.
+    let isInitialSnapshot = true;
+    const seenKey = `courtship_hug_seen_${session.roomId}_${session.role}`;
     const unsubscribe = onSnapshot(
       roomRef,
       (snap) => {
-        if (snap.exists()) setRoomMeta(snap.data() as Partial<Room>);
+        if (!snap.exists()) return;
+        const data = snap.data() as Partial<Room>;
+        setRoomMeta(data);
+
+        if (isInitialSnapshot) {
+          isInitialSnapshot = false;
+          const hug = data.lastHug;
+          if (hug?.nonce && hug.sender !== session.role && hug.nonce !== localStorage.getItem(seenKey)) {
+            setActiveHug({ from: session.partnerName });
+            localStorage.setItem(seenKey, hug.nonce);
+          }
+        }
       },
       (err) => console.error("Error syncing room metadata:", err)
     );
     return () => unsubscribe();
   }, [session]);
+
+  useEffect(() => {
+    // A virtual hug lingers on screen for 3 seconds, then fades away.
+    if (!activeHug) return;
+    const timeout = setTimeout(() => setActiveHug(null), 3000);
+    return () => clearTimeout(timeout);
+  }, [activeHug]);
 
   const handleOnboardingComplete = (newSession: UserSession) => {
     localStorage.setItem("courtship_session", JSON.stringify(newSession));
@@ -124,6 +151,30 @@ export default function App() {
     } catch (err) {
       console.error("Error updating avatar:", err);
       showToast("Failed to update your avatar. Please try again.");
+    }
+  };
+
+  const handleSendHug = async () => {
+    if (!session) return;
+    try {
+      const roomRef = doc(db, "rooms", session.roomId);
+      await setDoc(
+        roomRef,
+        {
+          lastHug: {
+            sender: session.role,
+            sentAt: new Date().toISOString(),
+            nonce: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+          }
+        },
+        { merge: true }
+      );
+      // The recipient sees the hug the next time they open the app, so the
+      // sender just gets a small confirmation here.
+      showToast(`Hug sent to ${session.partnerName} 🤗`, "success");
+    } catch (err) {
+      console.error("Error sending hug:", err);
+      showToast("Failed to send your hug. Please try again.");
     }
   };
 
@@ -330,7 +381,7 @@ export default function App() {
 
         {/* Tab Content Panel */}
         <div className="min-h-[400px]">
-          {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
+          {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} onSendHug={handleSendHug} />}
           {activeTab === "quest" && <DailyQuest session={session} />}
           {activeTab === "dates" && <DatePlanner session={session} />}
         </div>
@@ -348,6 +399,55 @@ export default function App() {
           <span>Both partners connected</span>
         </div>
       </footer>
+
+      {/* Virtual hug overlay — plays for 3 seconds on both partners' screens */}
+      <AnimatePresence>
+        {activeHug && (
+          <motion.div
+            id="hug-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex flex-col items-center justify-center pointer-events-none"
+          >
+            <div className="absolute inset-0 bg-natural-terracotta/[0.07] backdrop-blur-[1px]" />
+
+            {/* Floating hearts drifting up around the hug */}
+            {[...Array(6)].map((_, i) => (
+              <motion.span
+                key={i}
+                className="absolute text-2xl"
+                style={{ left: `${30 + i * 8}%`, bottom: "38%" }}
+                initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                animate={{ opacity: [0, 1, 0], y: -160 - i * 20, scale: 1 }}
+                transition={{ duration: 2.4, delay: 0.2 + i * 0.15, ease: "easeOut" }}
+              >
+                {i % 2 === 0 ? "❤️" : "🤍"}
+              </motion.span>
+            ))}
+
+            <motion.div
+              initial={{ scale: 0, rotate: -25 }}
+              animate={{ scale: [0, 1.35, 1, 1.08, 1], rotate: [-25, 8, -4, 2, 0] }}
+              transition={{ duration: 0.9, times: [0, 0.4, 0.6, 0.8, 1] }}
+              className="text-[130px] leading-none drop-shadow-xl relative"
+            >
+              🤗
+            </motion.div>
+
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="mt-4 font-serif italic text-xl text-natural-text bg-white/80 border border-natural-border rounded-full px-6 py-2 card-shadow relative"
+            >
+              {activeHug.from === "You"
+                ? `You sent ${session.partnerName} a warm hug`
+                : `${activeHug.from} sent you a warm hug`}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
