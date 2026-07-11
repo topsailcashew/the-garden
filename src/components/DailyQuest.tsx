@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, limit, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
-import { Question, UserSession } from "../types";
+import { Question, VaultQuestion, UserSession } from "../types";
 import { getQuestionOfToday } from "../data/questions";
 import { useConfirm } from "./ConfirmDialog";
-import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart } from "lucide-react";
+import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart, Archive, X, Trash2, Plus } from "lucide-react";
 
 interface DailyQuestProps {
   session: UserSession;
@@ -23,6 +23,11 @@ export default function DailyQuest({ session }: DailyQuestProps) {
   const [historyList, setHistoryList] = useState<Question[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
 
+  const [vaultQuestions, setVaultQuestions] = useState<VaultQuestion[]>([]);
+  const [showVault, setShowVault] = useState<boolean>(false);
+  const [vaultInput, setVaultInput] = useState<string>("");
+  const [submittingVault, setSubmittingVault] = useState<boolean>(false);
+
   // Get a stable, unique ID for today (e.g. q_2026_07_08)
   const getTodayId = () => {
     const today = new Date();
@@ -37,28 +42,63 @@ export default function DailyQuest({ session }: DailyQuestProps) {
   useEffect(() => {
     // Real-time listener for today's question
     const qRef = doc(db, "rooms", session.roomId, "questions", todayId);
-    
+    // Local guard so the missing-doc branch only initializes once per mount/day
+    // (the snapshot can fire repeatedly before the write lands).
+    let didInit = false;
+
     const unsubscribe = onSnapshot(qRef, async (docSnap) => {
       if (docSnap.exists()) {
         setTodayQuestion({ id: docSnap.id, ...docSnap.data() } as Question);
       } else {
-        // Automatically initialize today's question in Firestore if it doesn't exist
-        const defaultQ = getQuestionOfToday();
-        const initialQuestion: Question = {
-          id: todayId,
-          questionText: defaultQ.text
-        };
+        if (didInit) return;
+        didInit = true;
         try {
+          // Prefer the oldest question queued in the Vault; otherwise fall back
+          // to the curated default. A used Vault question is removed from the
+          // queue and lives on as today's quest (and later, history).
+          const vaultRef = collection(db, "rooms", session.roomId, "vault");
+          const vaultSnap = await getDocs(query(vaultRef, orderBy("createdAt", "asc"), limit(1)));
+
+          let questionText: string;
+          let usedVaultId: string | null = null;
+          if (!vaultSnap.empty) {
+            const v = vaultSnap.docs[0];
+            questionText = (v.data() as VaultQuestion).questionText;
+            usedVaultId = v.id;
+          } else {
+            questionText = getQuestionOfToday().text;
+          }
+
+          const initialQuestion: Question = { id: todayId, questionText };
           await setDoc(qRef, initialQuestion);
+          if (usedVaultId) {
+            await deleteDoc(doc(db, "rooms", session.roomId, "vault", usedVaultId));
+          }
           setTodayQuestion(initialQuestion);
         } catch (err) {
           console.error("Failed to initialize today's question:", err);
+          didInit = false; // allow a retry on the next snapshot
         }
       }
     });
 
     return () => unsubscribe();
   }, [session.roomId, todayId]);
+
+  useEffect(() => {
+    // Live subscription to the shared Questions Vault (FIFO by creation time).
+    const vaultRef = collection(db, "rooms", session.roomId, "vault");
+    const unsubscribe = onSnapshot(
+      query(vaultRef, orderBy("createdAt", "asc")),
+      (snap) => {
+        const list: VaultQuestion[] = [];
+        snap.forEach((d) => list.push({ id: d.id, ...d.data() } as VaultQuestion));
+        setVaultQuestions(list);
+      },
+      (err) => console.error("Error syncing questions vault:", err)
+    );
+    return () => unsubscribe();
+  }, [session.roomId]);
 
   // Load history when the history tab is active
   useEffect(() => {
@@ -192,6 +232,41 @@ export default function DailyQuest({ session }: DailyQuestProps) {
       setError("Failed to customize today's question. Try again.");
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const handleAddVaultQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vaultInput.trim()) return;
+    setSubmittingVault(true);
+    try {
+      await addDoc(collection(db, "rooms", session.roomId, "vault"), {
+        questionText: vaultInput.trim(),
+        createdBy: session.role,
+        createdAt: new Date().toISOString()
+      });
+      setVaultInput("");
+    } catch (err) {
+      console.error("Error adding vault question:", err);
+      setError("Failed to add your question. Please try again.");
+    } finally {
+      setSubmittingVault(false);
+    }
+  };
+
+  const handleDeleteVaultQuestion = async (id: string) => {
+    const confirmed = await confirm({
+      title: "Remove this question?",
+      message: "It'll be taken out of the queue and won't be asked as a Daily Quest.",
+      confirmLabel: "Remove",
+      danger: true
+    });
+    if (!confirmed) return;
+    try {
+      await deleteDoc(doc(db, "rooms", session.roomId, "vault", id));
+    } catch (err) {
+      console.error("Error deleting vault question:", err);
+      setError("Failed to remove that question. Please try again.");
     }
   };
 
@@ -545,6 +620,136 @@ export default function DailyQuest({ session }: DailyQuestProps) {
           )}
         </div>
       )}
+
+      {/* Floating Questions Vault button */}
+      <motion.button
+        id="btn-open-vault"
+        onClick={() => { setError(""); setShowVault(true); }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.92 }}
+        className="fixed bottom-6 right-6 z-50 bg-natural-olive hover:bg-natural-olive-hover text-white rounded-full shadow-lg py-3.5 px-5 flex items-center gap-2 font-serif italic text-sm cursor-pointer"
+        title="Queue up questions for future Daily Quests"
+      >
+        <Archive className="w-4 h-4" /> Questions Vault
+        {vaultQuestions.length > 0 && (
+          <span className="bg-white text-natural-olive text-[10px] font-bold rounded-full px-1.5 py-0.5 not-italic leading-none">
+            {vaultQuestions.length}
+          </span>
+        )}
+      </motion.button>
+
+      {/* Questions Vault modal */}
+      <AnimatePresence>
+        {showVault && (
+          <motion.div
+            id="vault-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowVault(false)}
+            className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"
+          >
+            <motion.div
+              id="vault-panel"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white border border-natural-border rounded-[32px] p-6 card-shadow textured-bg w-full max-w-md max-h-[88vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-1">
+                <h3 className="font-serif text-lg text-natural-text flex items-center gap-2 italic font-light">
+                  <Archive className="w-4 h-4 text-natural-terracotta" />
+                  Questions Vault
+                </h3>
+                <button
+                  id="btn-close-vault"
+                  onClick={() => setShowVault(false)}
+                  className="p-1.5 text-natural-text/50 hover:text-natural-text hover:bg-natural-card rounded-full cursor-pointer transition-all"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-natural-text/60 mb-4 leading-relaxed">
+                Queue up your own questions. Each becomes a Daily Quest — one per day, in the order added — for both of you to answer.
+              </p>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 text-xs rounded-xl text-center">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleAddVaultQuestion} className="flex gap-2 mb-5">
+                <input
+                  id="vault-input"
+                  type="text"
+                  value={vaultInput}
+                  onChange={(e) => setVaultInput(e.target.value)}
+                  placeholder="Write a question to ask each other..."
+                  maxLength={150}
+                  className="flex-1 bg-natural-card border border-natural-border rounded-xl py-2.5 px-3 text-xs text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none placeholder:text-natural-text/40"
+                />
+                <button
+                  id="btn-add-vault"
+                  type="submit"
+                  disabled={submittingVault || !vaultInput.trim()}
+                  className="bg-natural-olive hover:bg-natural-olive-hover disabled:bg-natural-card-darker disabled:text-natural-text/40 text-white rounded-xl px-3.5 flex items-center justify-center cursor-pointer transition-all flex-shrink-0"
+                  title="Add to queue"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </form>
+
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-natural-text/40">
+                  In the Queue ({vaultQuestions.length})
+                </span>
+              </div>
+
+              {vaultQuestions.length === 0 ? (
+                <div className="text-center py-8 bg-natural-card border border-dashed border-natural-border rounded-2xl">
+                  <p className="text-xs font-serif font-light italic text-natural-text">The vault is empty.</p>
+                  <p className="text-[11px] text-natural-text/50 mt-1">Add a question above and it'll be your next Daily Quest.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {vaultQuestions.map((v, index) => (
+                    <div
+                      id={`vault-item-${v.id}`}
+                      key={v.id}
+                      className="flex items-start gap-2.5 bg-natural-card border border-natural-border rounded-xl p-3"
+                    >
+                      <div className="flex-1">
+                        <p className="text-xs text-natural-text leading-relaxed font-serif italic">"{v.questionText}"</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          {index === 0 && (
+                            <span className="text-[9px] font-bold uppercase tracking-wide text-natural-olive bg-natural-olive/10 border border-natural-olive/30 rounded-full px-1.5 py-0.5">
+                              Up next
+                            </span>
+                          )}
+                          <span className="text-[10px] text-natural-text/45">
+                            Added by {v.createdBy === session.role ? "you" : session.partnerName}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        id={`btn-delete-vault-${v.id}`}
+                        onClick={() => handleDeleteVaultQuestion(v.id)}
+                        className="text-natural-text/40 hover:text-natural-terracotta transition-all cursor-pointer flex-shrink-0 mt-0.5"
+                        title="Remove from queue"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

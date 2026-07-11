@@ -32,6 +32,13 @@ export interface Question {
   girlAnswerReaction?: string; // Emoji reaction left on the girl's answer (by the boy)
 }
 
+export interface VaultQuestion {
+  id: string;
+  questionText: string;
+  createdBy: "boy" | "girl"; // Who queued the question
+  createdAt: any; // ISO string; used for FIFO ordering
+}
+
 export interface DatePlan {
   id: string;
   title: string;
