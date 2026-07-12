@@ -184,13 +184,27 @@ export default function DatePlanner({ session }: DatePlannerProps) {
     }
   };
 
-  // Divide dates into Confirmed (Upcoming), Proposed (Awaiting RSVPs), and Past (Completed)
-  const confirmedDates = dates.filter((d) => d.status === "confirmed" && new Date(d.date) >= now);
-  const proposedDates = dates.filter((d) => d.status === "proposed");
-  const completedOrPastDates = dates.filter((d) => d.status === "completed" || (d.status === "confirmed" && new Date(d.date) < now));
+  // Parse a plan's date to a timestamp for reliable chronological sorting
+  // (the stored string format can vary, so we sort by parsed time, not text).
+  const dateTime = (d: DatePlan) => {
+    const t = new Date(d.date).getTime();
+    return isNaN(t) ? Infinity : t;
+  };
+
+  // Divide dates into Confirmed (Upcoming), Proposed (Awaiting RSVPs), and Past
+  // (Completed). Upcoming lists are sorted nearest-first; memories most-recent-first.
+  const confirmedDates = dates
+    .filter((d) => d.status === "confirmed" && new Date(d.date) >= now)
+    .sort((a, b) => dateTime(a) - dateTime(b));
+  const proposedDates = dates
+    .filter((d) => d.status === "proposed")
+    .sort((a, b) => dateTime(a) - dateTime(b));
+  const completedOrPastDates = dates
+    .filter((d) => d.status === "completed" || (d.status === "confirmed" && new Date(d.date) < now))
+    .sort((a, b) => dateTime(b) - dateTime(a));
   const declinedDates = dates.filter((d) => d.status === "declined");
 
-  // Countdown to the soonest confirmed, upcoming date
+  // Countdown to the closest upcoming confirmed date
   const nextDate = confirmedDates[0];
   let countdown: { days: number; hours: number; minutes: number; seconds: number } | null = null;
   if (nextDate) {
