@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import { DatePlan, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
-import { Calendar, DollarSign, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2 } from "lucide-react";
+import { Calendar, Wallet, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2 } from "lucide-react";
 
 const parseShortDate = (rawDateStr: string) => {
   try {
@@ -327,7 +327,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                       <input
                         id="date-cost-input"
                         type="text"
-                        placeholder="e.g. $20, Free, $$"
+                        placeholder="e.g. 20,000 TZS or Free"
                         value={cost}
                         onChange={(e) => setCost(e.target.value)}
                         required
@@ -393,25 +393,25 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-natural-border text-xs text-natural-text/80">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <Clock className="w-4 h-4 text-natural-terracotta flex-shrink-0" />
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-[9px] font-bold text-natural-text/40 uppercase">When</div>
-                        <div className="font-medium truncate">{formatPlanDate(d.date)}</div>
+                        <div className="font-medium break-words leading-tight">{formatPlanDate(d.date)}</div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-natural-olive flex-shrink-0" />
-                      <div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Wallet className="w-4 h-4 text-natural-olive flex-shrink-0" />
+                      <div className="min-w-0">
                         <div className="text-[9px] font-bold text-natural-text/40 uppercase">Budget</div>
-                        <div className="font-semibold">{d.cost}</div>
+                        <div className="font-semibold truncate" title={d.cost}>{d.cost}</div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <BaggageClaim className="w-4 h-4 text-natural-text/60 flex-shrink-0" />
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-[9px] font-bold text-natural-text/40 uppercase">Prepare</div>
                         <div className="font-medium truncate" title={d.prepare}>{d.prepare}</div>
                       </div>
@@ -472,25 +472,25 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-natural-border text-xs text-natural-text/80">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <Clock className="w-4 h-4 text-natural-terracotta flex-shrink-0" />
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-[9px] font-bold text-natural-text/40 uppercase">Proposed Time</div>
-                          <div className="font-medium truncate">{formatPlanDate(d.date)}</div>
+                          <div className="font-medium break-words leading-tight">{formatPlanDate(d.date)}</div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <DollarSign className="w-4 h-4 text-natural-olive flex-shrink-0" />
-                        <div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Wallet className="w-4 h-4 text-natural-olive flex-shrink-0" />
+                        <div className="min-w-0">
                           <div className="text-[9px] font-bold text-natural-text/40 uppercase">Cost</div>
-                          <div className="font-semibold">{d.cost}</div>
+                          <div className="font-semibold truncate" title={d.cost}>{d.cost}</div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <BaggageClaim className="w-4 h-4 text-natural-text/60 flex-shrink-0" />
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-[9px] font-bold text-natural-text/40 uppercase">To Prepare</div>
                           <div className="font-medium truncate" title={d.prepare}>{d.prepare}</div>
                         </div>

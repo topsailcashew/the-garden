@@ -446,55 +446,66 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
           <Smile className="w-4 h-4 text-natural-terracotta" /> Today's Mood
         </h3>
 
-        <div className="flex flex-wrap items-center gap-6 mb-4 relative">
-          {[
-            { label: "You", mood: myMood },
-            { label: session.partnerName, mood: partnerMood }
-          ].map(({ label, mood }) => {
-            const option = getMoodOption(mood?.emoji);
-            return (
-              <div key={label} className="flex flex-col items-center gap-1.5">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={mood?.emoji || "none"}
-                    initial={{ scale: 0.5, opacity: 0, rotate: -15 }}
-                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                    exit={{ scale: 0.5, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
-                    className="w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner"
-                    style={{ backgroundColor: option ? `${option.color}30` : "var(--color-natural-card)" }}
-                    title={mood?.emoji ? option?.label : "No mood set yet"}
-                  >
-                    {mood?.emoji || "➖"}
-                  </motion.div>
-                </AnimatePresence>
-                <span className="text-[10px] font-bold text-natural-text/50 uppercase">{label}</span>
-              </div>
-            );
-          })}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-5 relative">
+          {/* Current moods, front & center and larger */}
+          <div className="flex items-center justify-center gap-5 flex-shrink-0 sm:pr-5 sm:border-r sm:border-natural-border">
+            {[
+              { label: "You", mood: myMood },
+              { label: session.partnerName, mood: partnerMood }
+            ].map(({ label, mood }) => {
+              const option = getMoodOption(mood?.emoji);
+              return (
+                <div key={label} className="flex flex-col items-center gap-1.5">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={mood?.emoji || "none"}
+                      initial={{ scale: 0.5, opacity: 0, rotate: -15 }}
+                      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                      exit={{ scale: 0.5, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                      className="w-16 h-16 rounded-full flex items-center justify-center text-4xl shadow-inner"
+                      style={{ backgroundColor: option ? `${option.color}30` : "var(--color-natural-card)" }}
+                      title={mood?.emoji ? option?.label : "No mood set yet"}
+                    >
+                      {mood?.emoji || "➖"}
+                    </motion.div>
+                  </AnimatePresence>
+                  <span className="text-[10px] font-bold text-natural-text/50 uppercase">{label}</span>
+                </div>
+              );
+            })}
+          </div>
 
-          {/* Fun combined caption */}
-          <AnimatePresence>
-            {myMood?.emoji && partnerMood?.emoji && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
+          {/* Caption / prompt — always present so the row never feels empty */}
+          <div className="flex-1 min-w-0 flex items-center">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={`${myMood?.emoji || "_"}-${partnerMood?.emoji || "_"}`}
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className={`text-xs font-serif italic rounded-full px-3.5 py-2 flex-1 min-w-[180px] ${
-                  myMood.emoji === partnerMood.emoji
+                className={`w-full text-sm font-serif italic rounded-2xl px-4 py-3 leading-relaxed ${
+                  myMood?.emoji && partnerMood?.emoji && myMood.emoji === partnerMood.emoji
                     ? "bg-natural-green/15 text-natural-green font-semibold"
                     : "bg-natural-card text-natural-text/70"
                 }`}
               >
-                {myMood.emoji === partnerMood.emoji
-                  ? `✨ You're mood twins today — both ${getMoodOption(myMood.emoji)?.caption}!`
-                  : `You're ${getMoodOption(myMood.emoji)?.caption}, ${session.partnerName} is ${getMoodOption(partnerMood.emoji)?.caption}.`}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {myMood?.emoji && partnerMood?.emoji
+                  ? myMood.emoji === partnerMood.emoji
+                    ? `✨ You're mood twins today — both ${getMoodOption(myMood.emoji)?.caption}!`
+                    : `You're ${getMoodOption(myMood.emoji)?.caption}, ${session.partnerName} is ${getMoodOption(partnerMood.emoji)?.caption}.`
+                  : myMood?.emoji
+                    ? `You're ${getMoodOption(myMood.emoji)?.caption}. See how ${session.partnerName} feels when they check in...`
+                    : partnerMood?.emoji
+                      ? `${session.partnerName} is ${getMoodOption(partnerMood.emoji)?.caption}. How are you feeling today?`
+                      : "How are you both feeling today? Tap a mood below to check in. 🌱"}
+              </motion.p>
+            </AnimatePresence>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 relative">
+        {/* Mood picker — spread evenly across the full width */}
+        <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 justify-items-center relative">
           {moodOptions.map(({ emoji: moodEmoji, label, color }) => {
             const isSelected = myMood?.emoji === moodEmoji;
             return (
@@ -506,7 +517,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
                 onClick={() => handleSetMood(moodEmoji)}
                 whileHover={{ scale: 1.15, rotate: 8 }}
                 whileTap={{ scale: 0.85, rotate: -8 }}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-base transition-colors cursor-pointer disabled:opacity-50 border-2"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-xl transition-colors cursor-pointer disabled:opacity-50 border-2"
                 style={{
                   backgroundColor: isSelected ? `${color}30` : "transparent",
                   borderColor: isSelected ? color : "transparent"
@@ -798,7 +809,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
               </p>
             </div>
           ) : (
-            <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
               <AnimatePresence>
                 {filteredNotes.map((note) => {
                   const style = paperStyles[note.paperType] || paperStyles.rose;
@@ -813,7 +824,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
                       onClick={() => isLocked && handleOpenNote(note)}
-                      className={`border rounded-2xl p-5 shadow-sm relative transition-all overflow-hidden flex flex-col justify-between min-h-[160px] mb-4 break-inside-avoid ${
+                      className={`border rounded-2xl p-5 shadow-sm relative transition-all overflow-hidden flex flex-col justify-between min-h-[160px] ${
                         style.bg
                       } ${isLocked ? "cursor-pointer hover:shadow-md hover:scale-[1.01]" : ""}`}
                     >
