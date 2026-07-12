@@ -164,6 +164,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [isComposerOpen, setIsComposerOpen] = useState<boolean>(false);
+  const [columnCount, setColumnCount] = useState<number>(1);
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
@@ -237,6 +238,19 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
 
     return () => unsubscribe();
   }, [session.roomId, noteLimit]);
+
+  useEffect(() => {
+    // Track how many masonry columns fit, matching the Tailwind breakpoints
+    // (1 / 2 / 3 / 4). We distribute notes across columns ourselves so the
+    // newest sits top-left and stays tightly packed (true masonry).
+    const computeColumns = () => {
+      const w = window.innerWidth;
+      setColumnCount(w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
+    };
+    computeColumns();
+    window.addEventListener("resize", computeColumns);
+    return () => window.removeEventListener("resize", computeColumns);
+  }, []);
 
   useEffect(() => {
     // Real-time subscription to today's mood check-ins for both partners
@@ -432,6 +446,142 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
 
   const myAvatar = session.role === "boy" ? avatars?.boy || "🧑" : avatars?.girl || "👩";
   const partnerAvatar = partnerRole === "boy" ? avatars?.boy || "🧑" : avatars?.girl || "👩";
+
+  // Distribute the (newest-first) notes round-robin across the masonry columns.
+  // Item 0 (newest) → column 0 top, item 1 → column 1 top, ... so the top row
+  // reads newest-first left-to-right, and a new note pushes the rest rightward
+  // while each column stays tightly packed vertically.
+  const noteColumns: Note[][] = Array.from({ length: columnCount }, () => []);
+  filteredNotes.forEach((note, i) => noteColumns[i % columnCount].push(note));
+
+  // Renders a single note card (shared by the masonry columns).
+  const renderNoteCard = (note: Note) => {
+    const style = paperStyles[note.paperType] || paperStyles.rose;
+    const isOwn = note.sender === session.role;
+    const isLocked = !isOwn && !note.read;
+
+    return (
+      <motion.div
+        id={`note-card-${note.id}`}
+        key={note.id}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        onClick={() => isLocked && handleOpenNote(note)}
+        className={`border rounded-2xl p-5 shadow-sm relative transition-all overflow-hidden flex flex-col justify-between min-h-[160px] ${
+          style.bg
+        } ${isLocked ? "cursor-pointer hover:shadow-md hover:scale-[1.01]" : ""}`}
+      >
+        {/* Note Header: avatar + name badge, color-coded per sender so
+            it's obvious at a glance who left each note */}
+        <div className="flex justify-between items-start mb-3">
+          <span
+            className={`text-[10px] font-bold py-0.5 pl-1 pr-2 rounded-full border flex items-center gap-1 not-italic ${
+              isOwn
+                ? "bg-natural-olive/10 border-natural-olive/40 text-natural-olive"
+                : "bg-natural-terracotta/10 border-natural-terracotta/40 text-natural-terracotta"
+            }`}
+            title={isOwn ? "You wrote this note" : `${session.partnerName} wrote this note`}
+          >
+            <span className="text-sm leading-none">{isOwn ? myAvatar : partnerAvatar}</span>
+            {isOwn ? "You" : session.partnerName}
+          </span>
+
+          <div className="flex items-center gap-2">
+            {/* Unread badge or Seal */}
+            {note.sender !== session.role && !note.read && (
+              <span className="bg-rose-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full animate-bounce not-italic">
+                New
+              </span>
+            )}
+            <span className="text-xs font-serif italic text-stone-400">{formatNoteTime(note.createdAt)}</span>
+            {isOwn && (
+              <button
+                id={`btn-delete-note-${note.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteNote(note.id);
+                }}
+                className="text-stone-400 hover:text-natural-terracotta transition-all cursor-pointer"
+                title="Delete this note"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Content / Envelope */}
+        {isLocked ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-4 space-y-2">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${style.seal} animate-pulse not-italic`}>
+              {note.emoji || "✉️"}
+            </div>
+            <span className="text-xs font-serif font-semibold text-stone-700">Click to break wax seal</span>
+            <span className="text-[10px] text-stone-400">Locked with care by {session.partnerName}</span>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col justify-between">
+            {note.imageUrl && (
+              <img
+                id={`note-image-${note.id}`}
+                src={note.imageUrl}
+                alt="Attached photo"
+                className="w-full rounded-xl mb-3 object-cover"
+              />
+            )}
+            {note.content && (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words pr-2">
+                {note.content}
+              </p>
+            )}
+
+            {/* Footer with Seal Emoji & Interactive Reactions */}
+            <div className="flex justify-between items-center mt-4 pt-3 border-t border-stone-200/10">
+              {/* Seal stack: the sender's original seal stays put; the
+                  recipient's reaction stacks partially on top of it */}
+              <div className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] rounded-full pl-1.5 pr-2.5 py-1 not-italic">
+                <div className="flex items-center">
+                  <span className="text-sm">{note.emoji || "💌"}</span>
+                  {note.reactionEmoji && (
+                    <span className="text-sm -ml-1.5 drop-shadow-sm" title="Reaction seal">{note.reactionEmoji}</span>
+                  )}
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-wide text-stone-400">
+                  {note.reactionEmoji ? "Seals" : "Seal"}
+                </span>
+              </div>
+
+              {/* Easy Reaction Buttons, grouped in their own pill so they read as a separate control */}
+              <div className="flex items-center gap-0.5 bg-white/70 border border-stone-200/60 rounded-full p-1 not-italic" title="React to this note">
+                {["❤️", "🥰", "🌹", "✨"].map((reaction) => (
+                  <button
+                    id={`react-${note.id}-${reaction}`}
+                    key={reaction}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReactToNote(note.id, reaction, note.reactionEmoji);
+                    }}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all active:scale-125 cursor-pointer hover:scale-110 ${
+                      note.reactionEmoji === reaction ? "bg-stone-200/70 border border-stone-300 shadow-inner" : "hover:bg-black/5"
+                    }`}
+                    title={`React with ${reaction}`}
+                  >
+                    {reaction}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cute decorative paper pin for stickies */}
+        {note.paperType === "sticky" && (
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-8 h-2.5 bg-amber-200/50 -rotate-3 rounded shadow-sm border-t border-amber-300" />
+        )}
+      </motion.div>
+    );
+  };
 
   return (
     <div id="love-notes-root" className="space-y-6">
@@ -809,136 +959,12 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-              <AnimatePresence>
-                {filteredNotes.map((note) => {
-                  const style = paperStyles[note.paperType] || paperStyles.rose;
-                  const isOwn = note.sender === session.role;
-                  const isLocked = !isOwn && !note.read;
-
-                  return (
-                    <motion.div
-                      id={`note-card-${note.id}`}
-                      key={note.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      onClick={() => isLocked && handleOpenNote(note)}
-                      className={`border rounded-2xl p-5 shadow-sm relative transition-all overflow-hidden flex flex-col justify-between min-h-[160px] ${
-                        style.bg
-                      } ${isLocked ? "cursor-pointer hover:shadow-md hover:scale-[1.01]" : ""}`}
-                    >
-                      {/* Note Header: avatar + name badge, color-coded per sender so
-                          it's obvious at a glance who left each note */}
-                      <div className="flex justify-between items-start mb-3">
-                        <span
-                          className={`text-[10px] font-bold py-0.5 pl-1 pr-2 rounded-full border flex items-center gap-1 not-italic ${
-                            isOwn
-                              ? "bg-natural-olive/10 border-natural-olive/40 text-natural-olive"
-                              : "bg-natural-terracotta/10 border-natural-terracotta/40 text-natural-terracotta"
-                          }`}
-                          title={isOwn ? "You wrote this note" : `${session.partnerName} wrote this note`}
-                        >
-                          <span className="text-sm leading-none">{isOwn ? myAvatar : partnerAvatar}</span>
-                          {isOwn ? "You" : session.partnerName}
-                        </span>
-                        
-                        <div className="flex items-center gap-2">
-                          {/* Unread badge or Seal */}
-                          {note.sender !== session.role && !note.read && (
-                            <span className="bg-rose-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full animate-bounce">
-                              New
-                            </span>
-                          )}
-                          <span className="text-xs font-serif italic text-stone-400">{formatNoteTime(note.createdAt)}</span>
-                          {isOwn && (
-                            <button
-                              id={`btn-delete-note-${note.id}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteNote(note.id);
-                              }}
-                              className="text-stone-400 hover:text-natural-terracotta transition-all cursor-pointer"
-                              title="Delete this note"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Content / Envelope */}
-                      {isLocked ? (
-                        <div className="flex-1 flex flex-col items-center justify-center py-4 space-y-2">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${style.seal} animate-pulse`}>
-                            {note.emoji || "✉️"}
-                          </div>
-                          <span className="text-xs font-serif font-semibold text-stone-700">Click to break wax seal</span>
-                          <span className="text-[10px] text-stone-400">Locked with care by {session.partnerName}</span>
-                        </div>
-                      ) : (
-                        <div className="flex-1 flex flex-col justify-between">
-                          {note.imageUrl && (
-                            <img
-                              id={`note-image-${note.id}`}
-                              src={note.imageUrl}
-                              alt="Attached photo"
-                              className="w-full rounded-xl mb-3 object-cover"
-                            />
-                          )}
-                          {note.content && (
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words pr-2">
-                              {note.content}
-                            </p>
-                          )}
-
-                          {/* Footer with Seal Emoji & Interactive Reactions */}
-                          <div className="flex justify-between items-center mt-4 pt-3 border-t border-stone-200/10">
-                            {/* Seal stack: the sender's original seal stays put; the
-                                recipient's reaction stacks partially on top of it */}
-                            <div className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] rounded-full pl-1.5 pr-2.5 py-1">
-                              <div className="flex items-center">
-                                <span className="text-sm">{note.emoji || "💌"}</span>
-                                {note.reactionEmoji && (
-                                  <span className="text-sm -ml-1.5 drop-shadow-sm" title="Reaction seal">{note.reactionEmoji}</span>
-                                )}
-                              </div>
-                              <span className="text-[9px] font-bold uppercase tracking-wide text-stone-400">
-                                {note.reactionEmoji ? "Seals" : "Seal"}
-                              </span>
-                            </div>
-
-                            {/* Easy Reaction Buttons, grouped in their own pill so they read as a separate control */}
-                            <div className="flex items-center gap-0.5 bg-white/70 border border-stone-200/60 rounded-full p-1" title="React to this note">
-                              {["❤️", "🥰", "🌹", "✨"].map((reaction) => (
-                                <button
-                                  id={`react-${note.id}-${reaction}`}
-                                  key={reaction}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleReactToNote(note.id, reaction, note.reactionEmoji);
-                                  }}
-                                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all active:scale-125 cursor-pointer hover:scale-110 ${
-                                    note.reactionEmoji === reaction ? "bg-stone-200/70 border border-stone-300 shadow-inner" : "hover:bg-black/5"
-                                  }`}
-                                  title={`React with ${reaction}`}
-                                >
-                                  {reaction}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Cute decorative paper pin for stickies */}
-                      {note.paperType === "sticky" && (
-                        <div className="absolute top-1 left-1/2 -translate-x-1/2 w-8 h-2.5 bg-amber-200/50 -rotate-3 rounded shadow-sm border-t border-amber-300" />
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
+            <div className="flex gap-4 items-start">
+              {noteColumns.map((col, ci) => (
+                <div key={ci} className="flex-1 min-w-0 flex flex-col gap-4">
+                  {col.map(renderNoteCard)}
+                </div>
+              ))}
             </div>
           )}
 
