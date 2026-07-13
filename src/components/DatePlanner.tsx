@@ -5,7 +5,61 @@ import { db } from "../firebase";
 import { DatePlan, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
-import { Calendar, Wallet, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2 } from "lucide-react";
+import { Calendar, Wallet, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2, ImagePlus, Loader2, Pencil } from "lucide-react";
+
+const MAX_ORIGINAL_FILE_BYTES = 20 * 1024 * 1024; // 20MB, before compression
+const MAX_PER_PHOTO_LENGTH = 500_000; // ~per-photo cap on the base64 data URI
+const MAX_PHOTOS_BUDGET = 950_000; // keep the whole date doc under Firestore's 1MB limit
+const MAX_PHOTOS = 8;
+
+// Resizes and compresses an image client-side into a small JPEG data URI. Date
+// photos are stored on the date document, so each is kept fairly small and the
+// total across a date is budgeted to stay under Firestore's 1MB doc limit.
+const compressDatePhoto = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const maxDimension = 1000;
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas not supported"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      let quality = 0.6;
+      let dataUri = canvas.toDataURL("image/jpeg", quality);
+      while (dataUri.length > MAX_PER_PHOTO_LENGTH && quality > 0.3) {
+        quality -= 0.12;
+        dataUri = canvas.toDataURL("image/jpeg", quality);
+      }
+      if (dataUri.length > MAX_PER_PHOTO_LENGTH) {
+        reject(new Error("TOO_LARGE"));
+        return;
+      }
+      resolve(dataUri);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("LOAD_FAILED"));
+    };
+    img.src = objectUrl;
+  });
+};
 
 const parseShortDate = (rawDateStr: string) => {
   try {
@@ -44,6 +98,15 @@ export default function DatePlanner({ session }: DatePlannerProps) {
   const [dateStr, setDateStr] = useState<string>("");
   const [cost, setCost] = useState<string>("");
   const [prepare, setPrepare] = useState<string>("");
+
+  // Editing a past date's memory (one-word summary + photos)
+  const [editingMemory, setEditingMemory] = useState<DatePlan | null>(null);
+  const [summaryInput, setSummaryInput] = useState<string>("");
+  const [memoryPhotos, setMemoryPhotos] = useState<string[]>([]);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isSavingMemory, setIsSavingMemory] = useState<boolean>(false);
+  const [memoryError, setMemoryError] = useState<string>("");
+  const memoryFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Subscription to date plans in the current room
@@ -152,6 +215,77 @@ export default function DatePlanner({ session }: DatePlannerProps) {
     } catch (err) {
       console.error("Error deleting date:", err);
       showToast("Failed to remove that date plan. Please try again.");
+    }
+  };
+
+  const openMemoryEditor = (d: DatePlan) => {
+    setEditingMemory(d);
+    setSummaryInput(d.summary || "");
+    setMemoryPhotos(d.photos || []);
+    setMemoryError("");
+  };
+
+  const handleAddMemoryPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length === 0) return;
+    setMemoryError("");
+    setIsCompressing(true);
+    try {
+      let running = [...memoryPhotos];
+      for (const file of files) {
+        if (running.length >= MAX_PHOTOS) {
+          setMemoryError(`You can add up to ${MAX_PHOTOS} photos per date.`);
+          break;
+        }
+        if (!file.type.startsWith("image/")) {
+          setMemoryError("Please choose image files only.");
+          continue;
+        }
+        if (file.size > MAX_ORIGINAL_FILE_BYTES) {
+          setMemoryError("One of those photos is too large (over 20MB).");
+          continue;
+        }
+        let dataUri: string;
+        try {
+          dataUri = await compressDatePhoto(file);
+        } catch {
+          setMemoryError("A photo couldn't be processed. Try a different one.");
+          continue;
+        }
+        const currentTotal = running.reduce((sum, p) => sum + p.length, 0);
+        if (currentTotal + dataUri.length > MAX_PHOTOS_BUDGET) {
+          setMemoryError("These photos are too large to store together. Try fewer or smaller photos.");
+          break;
+        }
+        running = [...running, dataUri];
+      }
+      setMemoryPhotos(running);
+    } finally {
+      setIsCompressing(false);
+      if (memoryFileRef.current) memoryFileRef.current.value = "";
+    }
+  };
+
+  const handleRemoveMemoryPhoto = (index: number) => {
+    setMemoryPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveMemory = async () => {
+    if (!editingMemory) return;
+    setIsSavingMemory(true);
+    setMemoryError("");
+    try {
+      const dateRef = doc(db, "rooms", session.roomId, "dates", editingMemory.id);
+      // Keep only the first word of the summary (a one-word recap).
+      const oneWord = summaryInput.trim().split(/\s+/)[0] || "";
+      await updateDoc(dateRef, { summary: oneWord, photos: memoryPhotos });
+      setEditingMemory(null);
+      showToast("Memory saved!", "success");
+    } catch (err) {
+      console.error("Error saving memory:", err);
+      setMemoryError("Failed to save. Please try again.");
+    } finally {
+      setIsSavingMemory(false);
     }
   };
 
@@ -576,21 +710,55 @@ export default function DatePlanner({ session }: DatePlannerProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {completedOrPastDates.map((d) => (
-                <div id={`date-memory-${d.id}`} key={d.id} className="bg-natural-card-darker border border-natural-border rounded-2xl p-4 shadow-sm relative space-y-2 opacity-85">
-                  <div className="flex justify-between items-start">
+                <div id={`date-memory-${d.id}`} key={d.id} className="bg-natural-card-darker border border-natural-border rounded-2xl p-4 shadow-sm relative space-y-2 opacity-95">
+                  <div className="flex justify-between items-start gap-2">
                     <h4 className="text-xs font-medium font-serif italic text-natural-text">{d.title}</h4>
-                    <span className="text-[8px] bg-natural-card text-natural-text/60 px-2 py-0.5 border border-natural-border rounded uppercase font-bold">Memory</span>
+                    {d.summary ? (
+                      <span className="text-[9px] bg-natural-green/15 text-natural-green px-2 py-0.5 border border-natural-green/30 rounded-full uppercase font-bold flex-shrink-0" title="Your one-word recap">
+                        {d.summary}
+                      </span>
+                    ) : (
+                      <span className="text-[8px] bg-natural-card text-natural-text/60 px-2 py-0.5 border border-natural-border rounded uppercase font-bold flex-shrink-0">Memory</span>
+                    )}
                   </div>
+
+                  {/* Photos from the date */}
+                  {d.photos && d.photos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {d.photos.slice(0, 6).map((photo, i) => (
+                        <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-natural-border">
+                          <img src={photo} alt={`Memory ${i + 1}`} className="w-full h-full object-cover" />
+                          {i === 5 && d.photos!.length > 6 && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[11px] font-bold">
+                              +{d.photos!.length - 6}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <p className="text-[11px] text-natural-text/60 line-clamp-2">{d.description || "A beautiful date we shared."}</p>
                   <div className="text-[10px] text-natural-text/40 pt-1.5 border-t border-natural-border flex justify-between items-center">
                     <span>{parseShortDate(`q_${d.date.replace(/[^0-9]/g, "_")}`)}</span>
-                    <button
-                      id={`btn-delete-memory-${d.id}`}
-                      onClick={() => handleDeleteDate(d.id)}
-                      className="text-natural-text/40 hover:text-natural-terracotta cursor-pointer transition-all"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        id={`btn-edit-memory-${d.id}`}
+                        onClick={() => openMemoryEditor(d)}
+                        className="text-natural-text/50 hover:text-natural-olive cursor-pointer transition-all flex items-center gap-1 font-semibold"
+                        title="Add a recap word and photos from this date"
+                      >
+                        <Pencil className="w-3 h-3" /> {d.summary || (d.photos && d.photos.length) ? "Edit" : "Add memories"}
+                      </button>
+                      <button
+                        id={`btn-delete-memory-${d.id}`}
+                        onClick={() => handleDeleteDate(d.id)}
+                        className="text-natural-text/40 hover:text-natural-terracotta cursor-pointer transition-all"
+                        title="Delete this memory"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -598,6 +766,121 @@ export default function DatePlanner({ session }: DatePlannerProps) {
           </div>
         )}
       </div>
+
+      {/* Memory editor: one-word recap + photos for a past date */}
+      <AnimatePresence>
+        {editingMemory && (
+          <motion.div
+            id="memory-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setEditingMemory(null)}
+            className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"
+          >
+            <motion.div
+              id="memory-panel"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white border border-natural-border rounded-[32px] p-6 card-shadow textured-bg w-full max-w-md max-h-[88vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-start mb-1">
+                <div>
+                  <h3 className="font-serif text-lg text-natural-text flex items-center gap-2 italic font-light">
+                    <Sparkles className="w-4 h-4 text-natural-terracotta" />
+                    Remember this date
+                  </h3>
+                  <p className="text-xs text-natural-text/60 mt-0.5">{editingMemory.title}</p>
+                </div>
+                <button
+                  id="btn-close-memory"
+                  onClick={() => setEditingMemory(null)}
+                  className="p-1.5 text-natural-text/50 hover:text-natural-text hover:bg-natural-card rounded-full cursor-pointer transition-all"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {memoryError && (
+                <div className="my-3 p-3 bg-red-50 text-red-700 text-xs rounded-xl text-center">{memoryError}</div>
+              )}
+
+              {/* One-word recap */}
+              <div className="mt-4">
+                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1.5">One-word recap</label>
+                <input
+                  id="memory-summary-input"
+                  type="text"
+                  value={summaryInput}
+                  onChange={(e) => setSummaryInput(e.target.value.replace(/\s/g, ""))}
+                  placeholder="e.g. Magical"
+                  maxLength={24}
+                  className="w-full bg-natural-card border border-natural-border rounded-xl py-2.5 px-3.5 text-sm text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none"
+                />
+                <p className="text-[10px] text-natural-text/40 mt-1">Sum up the date in a single word.</p>
+              </div>
+
+              {/* Photos */}
+              <div className="mt-4">
+                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1.5">
+                  Photos ({memoryPhotos.length}/{MAX_PHOTOS})
+                </label>
+                <input
+                  ref={memoryFileRef}
+                  id="memory-photo-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleAddMemoryPhotos}
+                  className="hidden"
+                />
+                {memoryPhotos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {memoryPhotos.map((photo, i) => (
+                      <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-natural-border group">
+                        <img src={photo} alt={`Memory ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          id={`btn-remove-memory-photo-${i}`}
+                          type="button"
+                          onClick={() => handleRemoveMemoryPhoto(i)}
+                          className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 cursor-pointer transition-all"
+                          title="Remove photo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {memoryPhotos.length < MAX_PHOTOS && (
+                  <button
+                    id="btn-add-memory-photos"
+                    type="button"
+                    disabled={isCompressing}
+                    onClick={() => memoryFileRef.current?.click()}
+                    className="w-full border border-dashed border-natural-border hover:border-natural-olive rounded-2xl py-4 flex flex-col items-center justify-center gap-1.5 text-natural-text/50 hover:text-natural-olive cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {isCompressing ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
+                    <span className="text-[11px] font-medium">{isCompressing ? "Processing photos..." : "Add photos from the date"}</span>
+                  </button>
+                )}
+              </div>
+
+              <button
+                id="btn-save-memory"
+                onClick={handleSaveMemory}
+                disabled={isSavingMemory || isCompressing}
+                className="w-full mt-5 bg-natural-olive hover:bg-natural-olive-hover disabled:bg-natural-card-darker disabled:text-natural-text/40 text-white font-medium font-serif italic text-sm py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                {isSavingMemory ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save Memory</>}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

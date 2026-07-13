@@ -50,6 +50,8 @@ export interface DatePlan {
   proposedBy: "boy" | "girl";
   acceptedBy?: "boy" | "girl" | null;
   createdAt: any;
+  summary?: string; // A one-word recap added after the date happened
+  photos?: string[]; // Compressed photos from the date (base64 data URIs)
 }
 
 export interface MoodEntry {
