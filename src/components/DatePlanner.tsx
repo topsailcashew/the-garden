@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import { DatePlan, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
-import { Calendar, Wallet, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2, ImagePlus, Loader2, Pencil } from "lucide-react";
+import { Calendar, Wallet, BaggageClaim, ShieldAlert, CheckCircle, Plus, Send, Clock, Sparkles, X, Trash2, ImagePlus, Loader2, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 
 const MAX_ORIGINAL_FILE_BYTES = 20 * 1024 * 1024; // 20MB, before compression
 const MAX_PER_PHOTO_LENGTH = 500_000; // ~per-photo cap on the base64 data URI
@@ -108,6 +108,13 @@ export default function DatePlanner({ session }: DatePlannerProps) {
   const [memoryError, setMemoryError] = useState<string>("");
   const memoryFileRef = useRef<HTMLInputElement>(null);
 
+  // Fullscreen photo slideshow/lightbox
+  const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
+
+  // Each partner has their own one-word recap field.
+  const mySummaryField = session.role === "boy" ? "boySummary" : "girlSummary";
+  const partnerSummaryField = session.role === "boy" ? "girlSummary" : "boySummary";
+
   useEffect(() => {
     // Subscription to date plans in the current room
     const datesRef = collection(db, "rooms", session.roomId, "dates");
@@ -136,6 +143,18 @@ export default function DatePlanner({ session }: DatePlannerProps) {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    // Keyboard navigation for the photo slideshow
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightbox(null);
+      else if (e.key === "ArrowRight") setLightbox((lb) => (lb ? { ...lb, index: (lb.index + 1) % lb.photos.length } : lb));
+      else if (e.key === "ArrowLeft") setLightbox((lb) => (lb ? { ...lb, index: (lb.index - 1 + lb.photos.length) % lb.photos.length } : lb));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
 
   useEffect(() => {
     // Scroll the proposal form into view so opening it doesn't feel like
@@ -220,7 +239,8 @@ export default function DatePlanner({ session }: DatePlannerProps) {
 
   const openMemoryEditor = (d: DatePlan) => {
     setEditingMemory(d);
-    setSummaryInput(d.summary || "");
+    // Prefill with my own recap (falling back to the old shared one, once).
+    setSummaryInput((d[mySummaryField] as string) || d.summary || "");
     setMemoryPhotos(d.photos || []);
     setMemoryError("");
   };
@@ -276,9 +296,10 @@ export default function DatePlanner({ session }: DatePlannerProps) {
     setMemoryError("");
     try {
       const dateRef = doc(db, "rooms", session.roomId, "dates", editingMemory.id);
-      // Keep only the first word of the summary (a one-word recap).
+      // Keep only the first word of the summary (a one-word recap). Each partner
+      // saves to their own field so both recaps live side by side.
       const oneWord = summaryInput.trim().split(/\s+/)[0] || "";
-      await updateDoc(dateRef, { summary: oneWord, photos: memoryPhotos });
+      await updateDoc(dateRef, { [mySummaryField]: oneWord, photos: memoryPhotos });
       setEditingMemory(null);
       showToast("Memory saved!", "success");
     } catch (err) {
@@ -709,31 +730,59 @@ export default function DatePlanner({ session }: DatePlannerProps) {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {completedOrPastDates.map((d) => (
+              {completedOrPastDates.map((d) => {
+                const myWord = d[mySummaryField] as string | undefined;
+                const partnerWord = d[partnerSummaryField] as string | undefined;
+                const legacyWord = !myWord && !partnerWord ? d.summary : undefined;
+                const hasAnyMemory = myWord || partnerWord || legacyWord || (d.photos && d.photos.length);
+
+                return (
                 <div id={`date-memory-${d.id}`} key={d.id} className="bg-natural-card-darker border border-natural-border rounded-2xl p-4 shadow-sm relative space-y-2 opacity-95">
                   <div className="flex justify-between items-start gap-2">
                     <h4 className="text-xs font-medium font-serif italic text-natural-text">{d.title}</h4>
-                    {d.summary ? (
-                      <span className="text-[9px] bg-natural-green/15 text-natural-green px-2 py-0.5 border border-natural-green/30 rounded-full uppercase font-bold flex-shrink-0" title="Your one-word recap">
-                        {d.summary}
-                      </span>
-                    ) : (
-                      <span className="text-[8px] bg-natural-card text-natural-text/60 px-2 py-0.5 border border-natural-border rounded uppercase font-bold flex-shrink-0">Memory</span>
-                    )}
+                    <span className="text-[8px] bg-natural-card text-natural-text/60 px-2 py-0.5 border border-natural-border rounded uppercase font-bold flex-shrink-0">Memory</span>
                   </div>
 
-                  {/* Photos from the date */}
+                  {/* Each partner's one-word recap */}
+                  {(myWord || partnerWord || legacyWord) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {myWord && (
+                        <span className="text-[9px] bg-natural-olive/10 text-natural-olive px-2 py-0.5 border border-natural-olive/30 rounded-full uppercase font-bold" title="Your recap">
+                          You · {myWord}
+                        </span>
+                      )}
+                      {partnerWord && (
+                        <span className="text-[9px] bg-natural-terracotta/10 text-natural-terracotta px-2 py-0.5 border border-natural-terracotta/30 rounded-full uppercase font-bold" title={`${session.partnerName}'s recap`}>
+                          {session.partnerName} · {partnerWord}
+                        </span>
+                      )}
+                      {legacyWord && (
+                        <span className="text-[9px] bg-natural-green/15 text-natural-green px-2 py-0.5 border border-natural-green/30 rounded-full uppercase font-bold">
+                          {legacyWord}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Photos from the date — tap to open the slideshow */}
                   {d.photos && d.photos.length > 0 && (
                     <div className="grid grid-cols-3 gap-1.5">
                       {d.photos.slice(0, 6).map((photo, i) => (
-                        <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-natural-border">
+                        <button
+                          id={`memory-photo-${d.id}-${i}`}
+                          key={i}
+                          type="button"
+                          onClick={() => setLightbox({ photos: d.photos!, index: i })}
+                          className="relative aspect-square rounded-lg overflow-hidden border border-natural-border cursor-pointer hover:opacity-90 transition-opacity"
+                          title="Open slideshow"
+                        >
                           <img src={photo} alt={`Memory ${i + 1}`} className="w-full h-full object-cover" />
                           {i === 5 && d.photos!.length > 6 && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[11px] font-bold">
                               +{d.photos!.length - 6}
                             </div>
                           )}
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -746,9 +795,9 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                         id={`btn-edit-memory-${d.id}`}
                         onClick={() => openMemoryEditor(d)}
                         className="text-natural-text/50 hover:text-natural-olive cursor-pointer transition-all flex items-center gap-1 font-semibold"
-                        title="Add a recap word and photos from this date"
+                        title="Add your recap word and photos from this date"
                       >
-                        <Pencil className="w-3 h-3" /> {d.summary || (d.photos && d.photos.length) ? "Edit" : "Add memories"}
+                        <Pencil className="w-3 h-3" /> {hasAnyMemory ? "Edit" : "Add memories"}
                       </button>
                       <button
                         id={`btn-delete-memory-${d.id}`}
@@ -761,7 +810,8 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -808,9 +858,9 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                 <div className="my-3 p-3 bg-red-50 text-red-700 text-xs rounded-xl text-center">{memoryError}</div>
               )}
 
-              {/* One-word recap */}
+              {/* One-word recap (yours) */}
               <div className="mt-4">
-                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1.5">One-word recap</label>
+                <label className="block text-[10px] font-bold text-natural-text/60 uppercase mb-1.5">Your one-word recap</label>
                 <input
                   id="memory-summary-input"
                   type="text"
@@ -821,6 +871,13 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                   className="w-full bg-natural-card border border-natural-border rounded-xl py-2.5 px-3.5 text-sm text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none"
                 />
                 <p className="text-[10px] text-natural-text/40 mt-1">Sum up the date in a single word.</p>
+                {(editingMemory[partnerSummaryField] as string) && (
+                  <p className="text-[11px] text-natural-text/60 mt-1.5 flex items-center gap-1.5">
+                    <span className="text-[9px] bg-natural-terracotta/10 text-natural-terracotta px-2 py-0.5 border border-natural-terracotta/30 rounded-full uppercase font-bold">
+                      {session.partnerName} · {editingMemory[partnerSummaryField] as string}
+                    </span>
+                  </p>
+                )}
               </div>
 
               {/* Photos */}
@@ -841,7 +898,13 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     {memoryPhotos.map((photo, i) => (
                       <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-natural-border group">
-                        <img src={photo} alt={`Memory ${i + 1}`} className="w-full h-full object-cover" />
+                        <img
+                          src={photo}
+                          alt={`Memory ${i + 1}`}
+                          onClick={() => setLightbox({ photos: memoryPhotos, index: i })}
+                          className="w-full h-full object-cover cursor-pointer"
+                          title="Open slideshow"
+                        />
                         <button
                           id={`btn-remove-memory-photo-${i}`}
                           type="button"
@@ -878,6 +941,73 @@ export default function DatePlanner({ session }: DatePlannerProps) {
                 {isSavingMemory ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save Memory</>}
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Fullscreen photo slideshow / lightbox */}
+      <AnimatePresence>
+        {lightbox && (
+          <motion.div
+            id="lightbox-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightbox(null)}
+            className="fixed inset-0 z-[110] bg-black/90 flex items-center justify-center p-4 select-none"
+          >
+            <button
+              id="btn-close-lightbox"
+              onClick={() => setLightbox(null)}
+              className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 cursor-pointer transition-all z-10"
+              title="Close (Esc)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={lightbox.index}
+                src={lightbox.photos[lightbox.index]}
+                alt={`Photo ${lightbox.index + 1}`}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.18 }}
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[85vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl"
+              />
+            </AnimatePresence>
+
+            {lightbox.photos.length > 1 && (
+              <>
+                <button
+                  id="btn-lightbox-prev"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightbox((lb) => (lb ? { ...lb, index: (lb.index - 1 + lb.photos.length) % lb.photos.length } : lb));
+                  }}
+                  className="absolute left-3 sm:left-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2.5 cursor-pointer transition-all"
+                  title="Previous"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  id="btn-lightbox-next"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightbox((lb) => (lb ? { ...lb, index: (lb.index + 1) % lb.photos.length } : lb));
+                  }}
+                  className="absolute right-3 sm:right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2.5 cursor-pointer transition-all"
+                  title="Next"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+                <div className="absolute bottom-6 text-white/80 text-xs font-serif italic bg-white/10 rounded-full px-3 py-1">
+                  {lightbox.index + 1} / {lightbox.photos.length}
+                </div>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
