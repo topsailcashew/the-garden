@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import { Note, MoodEntry, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
-import { PenTool, Heart, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check } from "lucide-react";
+import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check } from "lucide-react";
 
 const NOTES_PAGE_SIZE = 30;
 
@@ -215,8 +215,7 @@ const moodOptions: MoodOption[] = [
 
 const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === emoji);
 
-// Quick reactions shown inline on each note; the full set opens from the seal stack.
-const QUICK_REACTIONS = ["❤️", "🥰", "🌹", "✨", "😂", "🔥"];
+// The full set of reactions shown in the picker popup.
 const ALL_REACTIONS = [
   "❤️", "🥰", "😍", "🥹", "😂", "🤗",
   "🌹", "✨", "🔥", "🥳", "😮", "😢",
@@ -636,25 +635,18 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
                 </span>
               </button>
 
-              {/* Quick reactions; the full set opens from the seal stack. */}
-              <div className="flex items-center gap-0.5 bg-white/70 border border-stone-200/60 rounded-full p-1 not-italic" title="React to this note">
-                {QUICK_REACTIONS.map((reaction) => (
-                  <button
-                    id={`react-${note.id}-${reaction}`}
-                    key={reaction}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleReactToNote(note.id, reaction, note.reactionEmoji);
-                    }}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all active:scale-125 cursor-pointer hover:scale-110 ${
-                      note.reactionEmoji === reaction ? "bg-stone-200/70 border border-stone-300 shadow-inner" : "hover:bg-black/5"
-                    }`}
-                    title={`React with ${reaction}`}
-                  >
-                    {reaction}
-                  </button>
-                ))}
-              </div>
+              {/* React trigger — opens the full reaction picker */}
+              <button
+                id={`react-trigger-${note.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReactionPickerNoteId(note.id);
+                }}
+                className="flex items-center gap-1 text-xs text-stone-600 bg-white/70 hover:bg-white border border-stone-200/60 rounded-full px-2.5 py-1 not-italic cursor-pointer transition-all flex-shrink-0"
+                title="React to this note"
+              >
+                <SmilePlus className="w-3.5 h-3.5" /> React
+              </button>
             </div>
           </div>
         )}
@@ -672,7 +664,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
       {/* Daily Mood Tracker */}
       <div id="mood-tracker" className="relative bg-white border border-natural-border rounded-[32px] p-5 card-shadow textured-bg animate-fade-in overflow-hidden">
         {/* Big faint decorative emoji in the corner, echoing whatever mood is winning today */}
-        <div className="absolute -top-6 -right-4 text-8xl opacity-[0.05] rotate-12 pointer-events-none select-none">
+        <div className="absolute -top-8 -right-5 text-9xl opacity-[0.05] rotate-12 pointer-events-none select-none">
           {myMood?.emoji || partnerMood?.emoji || "🌱"}
         </div>
 
@@ -1084,10 +1076,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
               onClick={(e) => e.stopPropagation()}
               className="bg-white border border-natural-border rounded-[28px] p-5 card-shadow textured-bg w-full max-w-xs"
             >
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-serif text-base text-natural-text italic font-light flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-natural-terracotta" /> React to this note
-                </h3>
+              <div className="flex justify-end items-center mb-2">
                 <button
                   id="btn-close-reaction-picker"
                   onClick={() => setReactionPickerNoteId(null)}
