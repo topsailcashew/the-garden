@@ -147,10 +147,82 @@ const moodOptions: MoodOption[] = [
     color: "#6FADC4",
     caption: "feeling cool as ever",
     suggestion: (name, p) => `${name} is feeling cool as ever — keep the good vibes going with ${p}!`
+  },
+  {
+    emoji: "🤩",
+    label: "Excited",
+    color: "#F2A03D",
+    caption: "buzzing with excitement",
+    suggestion: (name, p) => `${name} is buzzing with excitement — match ${p}'s energy!`
+  },
+  {
+    emoji: "🥰",
+    label: "Loved",
+    color: "#F08BA8",
+    caption: "feeling loved",
+    suggestion: (name, p) => `${name} is feeling loved — remind ${p} just how much you adore them.`
+  },
+  {
+    emoji: "🙏",
+    label: "Grateful",
+    color: "#C9A66B",
+    caption: "feeling grateful",
+    suggestion: (name) => `${name} is feeling grateful — share something you appreciate about each other.`
+  },
+  {
+    emoji: "🤪",
+    label: "Silly",
+    color: "#7FBF9E",
+    caption: "in a silly mood",
+    suggestion: (name, p) => `${name} is in a silly mood — send ${p} something goofy to make them laugh!`
+  },
+  {
+    emoji: "😩",
+    label: "Stressed",
+    color: "#D98B6B",
+    caption: "feeling stressed",
+    suggestion: (name, p) => `${name} is feeling stressed — remind ${p} to breathe and that you've got their back.`
+  },
+  {
+    emoji: "😐",
+    label: "Meh",
+    color: "#A9A99C",
+    caption: "feeling kind of meh",
+    suggestion: (name, p) => `${name} is feeling kind of meh — a little surprise might turn ${p}'s day around.`
+  },
+  {
+    emoji: "🌈",
+    label: "Hopeful",
+    color: "#7BB0C7",
+    caption: "feeling hopeful",
+    suggestion: (name) => `${name} is feeling hopeful — dream a little about your future together.`
+  },
+  {
+    emoji: "😭",
+    label: "Emotional",
+    color: "#8FB8DE",
+    caption: "feeling emotional",
+    suggestion: (name, p) => `${name} is feeling emotional — hold space for ${p} and let them know you're here.`
+  },
+  {
+    emoji: "😜",
+    label: "Playful",
+    color: "#9DBF8A",
+    caption: "feeling playful",
+    suggestion: (name, p) => `${name} is feeling playful — start a little game or tease with ${p}!`
   }
 ];
 
 const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === emoji);
+
+// Quick reactions shown inline on each note; the full set opens from the seal stack.
+const QUICK_REACTIONS = ["❤️", "🥰", "🌹", "✨", "😂", "🔥"];
+const ALL_REACTIONS = [
+  "❤️", "🥰", "😍", "🥹", "😂", "🤗",
+  "🌹", "✨", "🔥", "🥳", "😮", "😢",
+  "🙏", "💯", "👏", "💕", "😘", "🤩",
+  "😭", "🫶", "💖", "😅", "🙌", "🤔"
+];
 
 export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProps) {
   const { showToast } = useToast();
@@ -158,6 +230,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteLimit, setNoteLimit] = useState<number>(NOTES_PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [reactionPickerNoteId, setReactionPickerNoteId] = useState<string | null>(null);
   const [content, setContent] = useState<string>("");
   const [paperType, setPaperType] = useState<Note["paperType"]>("rose");
   const [emoji, setEmoji] = useState<string>("💌");
@@ -454,6 +527,9 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
   const noteColumns: Note[][] = Array.from({ length: columnCount }, () => []);
   filteredNotes.forEach((note, i) => noteColumns[i % columnCount].push(note));
 
+  // The note whose full reaction picker is open (kept fresh from live notes).
+  const reactionPickerNote = reactionPickerNoteId ? notes.find((n) => n.id === reactionPickerNoteId) : null;
+
   // Renders a single note card (shared by the masonry columns).
   const renderNoteCard = (note: Note) => {
     const style = paperStyles[note.paperType] || paperStyles.rose;
@@ -537,10 +613,18 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
             )}
 
             {/* Footer with Seal Emoji & Interactive Reactions */}
-            <div className="flex justify-between items-center mt-4 pt-3 border-t border-stone-200/10">
-              {/* Seal stack: the sender's original seal stays put; the
-                  recipient's reaction stacks partially on top of it */}
-              <div className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] rounded-full pl-1.5 pr-2.5 py-1 not-italic">
+            <div className="flex justify-between items-center gap-2 mt-4 pt-3 border-t border-stone-200/10">
+              {/* Seal stack: the sender's original seal + recipient's reaction.
+                  Tap it to open the full reaction picker. */}
+              <button
+                id={`seal-stack-${note.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReactionPickerNoteId(note.id);
+                }}
+                className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] hover:bg-black/[0.07] rounded-full pl-1.5 pr-2.5 py-1 not-italic cursor-pointer transition-all flex-shrink-0"
+                title="Tap to pick a reaction"
+              >
                 <div className="flex items-center">
                   <span className="text-sm">{note.emoji || "💌"}</span>
                   {note.reactionEmoji && (
@@ -550,11 +634,11 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
                 <span className="text-[9px] font-bold uppercase tracking-wide text-stone-400">
                   {note.reactionEmoji ? "Seals" : "Seal"}
                 </span>
-              </div>
+              </button>
 
-              {/* Easy Reaction Buttons, grouped in their own pill so they read as a separate control */}
+              {/* Quick reactions; the full set opens from the seal stack. */}
               <div className="flex items-center gap-0.5 bg-white/70 border border-stone-200/60 rounded-full p-1 not-italic" title="React to this note">
-                {["❤️", "🥰", "🌹", "✨"].map((reaction) => (
+                {QUICK_REACTIONS.map((reaction) => (
                   <button
                     id={`react-${note.id}-${reaction}`}
                     key={reaction}
@@ -980,6 +1064,69 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
             </div>
           )}
       </div>
+
+      {/* Full reaction picker — opens when the seal stack is tapped */}
+      <AnimatePresence>
+        {reactionPickerNote && (
+          <motion.div
+            id="reaction-picker-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setReactionPickerNoteId(null)}
+            className="fixed inset-0 z-[95] bg-black/40 flex items-center justify-center p-4"
+          >
+            <motion.div
+              id="reaction-picker-panel"
+              initial={{ opacity: 0, scale: 0.9, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 16 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white border border-natural-border rounded-[28px] p-5 card-shadow textured-bg w-full max-w-xs"
+            >
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-serif text-base text-natural-text italic font-light flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-natural-terracotta" /> React to this note
+                </h3>
+                <button
+                  id="btn-close-reaction-picker"
+                  onClick={() => setReactionPickerNoteId(null)}
+                  className="p-1 text-natural-text/50 hover:text-natural-text hover:bg-natural-card rounded-full cursor-pointer transition-all"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-6 gap-1.5">
+                {ALL_REACTIONS.map((reaction) => (
+                  <button
+                    id={`picker-react-${reaction}`}
+                    key={reaction}
+                    onClick={() => handleReactToNote(reactionPickerNote.id, reaction, reactionPickerNote.reactionEmoji)}
+                    className={`aspect-square rounded-xl flex items-center justify-center text-xl transition-all active:scale-125 cursor-pointer hover:scale-110 ${
+                      reactionPickerNote.reactionEmoji === reaction ? "bg-natural-card-darker border border-natural-border shadow-inner" : "hover:bg-natural-card"
+                    }`}
+                    title={`React with ${reaction}`}
+                  >
+                    {reaction}
+                  </button>
+                ))}
+              </div>
+
+              {reactionPickerNote.reactionEmoji && (
+                <button
+                  id="btn-clear-reaction"
+                  onClick={() => handleReactToNote(reactionPickerNote.id, reactionPickerNote.reactionEmoji!, reactionPickerNote.reactionEmoji)}
+                  className="w-full mt-3 text-[11px] text-natural-text/50 hover:text-natural-terracotta py-1.5 cursor-pointer transition-all"
+                >
+                  Remove my reaction
+                </button>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
