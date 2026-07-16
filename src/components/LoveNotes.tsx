@@ -191,7 +191,7 @@ const moodOptions: MoodOption[] = [
     suggestion: (name, p) => `${name} is feeling kind of meh — a little surprise might turn ${p}'s day around.`
   },
   {
-    emoji: "🌈",
+    emoji: "🤞",
     label: "Hopeful",
     color: "#7BB0C7",
     caption: "feeling hopeful",
