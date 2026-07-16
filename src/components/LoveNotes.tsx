@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { Note, MoodEntry, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
+import ReactionPicker from "./ReactionPicker";
 import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check } from "lucide-react";
 
 const NOTES_PAGE_SIZE = 30;
@@ -214,14 +215,6 @@ const moodOptions: MoodOption[] = [
 ];
 
 const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === emoji);
-
-// The full set of reactions shown in the picker popup.
-const ALL_REACTIONS = [
-  "❤️", "🥰", "😍", "🥹", "😂", "🤗",
-  "🌹", "✨", "🔥", "🥳", "😮", "😢",
-  "🙏", "💯", "👏", "💕", "😘", "🤩",
-  "😭", "🫶", "💖", "😅", "🙌", "🤔"
-];
 
 export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProps) {
   const { showToast } = useToast();
@@ -1057,65 +1050,20 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
           )}
       </div>
 
-      {/* Full reaction picker — opens when the seal stack is tapped */}
-      <AnimatePresence>
-        {reactionPickerNote && (
-          <motion.div
-            id="reaction-picker-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setReactionPickerNoteId(null)}
-            className="fixed inset-0 z-[95] bg-black/40 flex items-center justify-center p-4"
-          >
-            <motion.div
-              id="reaction-picker-panel"
-              initial={{ opacity: 0, scale: 0.9, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 16 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white border border-natural-border rounded-[28px] p-5 card-shadow textured-bg w-full max-w-xs"
-            >
-              <div className="flex justify-end items-center mb-2">
-                <button
-                  id="btn-close-reaction-picker"
-                  onClick={() => setReactionPickerNoteId(null)}
-                  className="p-1 text-natural-text/50 hover:text-natural-text hover:bg-natural-card rounded-full cursor-pointer transition-all"
-                  title="Close"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-6 gap-1.5">
-                {ALL_REACTIONS.map((reaction) => (
-                  <button
-                    id={`picker-react-${reaction}`}
-                    key={reaction}
-                    onClick={() => handleReactToNote(reactionPickerNote.id, reaction, reactionPickerNote.reactionEmoji)}
-                    className={`aspect-square rounded-xl flex items-center justify-center text-xl transition-all active:scale-125 cursor-pointer hover:scale-110 ${
-                      reactionPickerNote.reactionEmoji === reaction ? "bg-natural-card-darker border border-natural-border shadow-inner" : "hover:bg-natural-card"
-                    }`}
-                    title={`React with ${reaction}`}
-                  >
-                    {reaction}
-                  </button>
-                ))}
-              </div>
-
-              {reactionPickerNote.reactionEmoji && (
-                <button
-                  id="btn-clear-reaction"
-                  onClick={() => handleReactToNote(reactionPickerNote.id, reactionPickerNote.reactionEmoji!, reactionPickerNote.reactionEmoji)}
-                  className="w-full mt-3 text-[11px] text-natural-text/50 hover:text-natural-terracotta py-1.5 cursor-pointer transition-all"
-                >
-                  Remove my reaction
-                </button>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Full reaction picker — opens when the seal stack / React button is tapped */}
+      <ReactionPicker
+        open={!!reactionPickerNote}
+        currentReaction={reactionPickerNote?.reactionEmoji}
+        onSelect={(emoji) => {
+          if (reactionPickerNote) handleReactToNote(reactionPickerNote.id, emoji, reactionPickerNote.reactionEmoji);
+          setReactionPickerNoteId(null);
+        }}
+        onClose={() => setReactionPickerNoteId(null)}
+        onClear={() => {
+          if (reactionPickerNote?.reactionEmoji) handleReactToNote(reactionPickerNote.id, reactionPickerNote.reactionEmoji, reactionPickerNote.reactionEmoji);
+          setReactionPickerNoteId(null);
+        }}
+      />
     </div>
   );
 }

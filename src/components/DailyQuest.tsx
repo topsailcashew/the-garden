@@ -5,7 +5,8 @@ import { db } from "../firebase";
 import { Question, VaultQuestion, UserSession } from "../types";
 import { getQuestionOfToday } from "../data/questions";
 import { useConfirm } from "./ConfirmDialog";
-import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart, Archive, X, Trash2, Plus } from "lucide-react";
+import ReactionPicker from "./ReactionPicker";
+import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart, Archive, X, Trash2, Plus, SmilePlus } from "lucide-react";
 
 interface DailyQuestProps {
   session: UserSession;
@@ -22,6 +23,7 @@ export default function DailyQuest({ session }: DailyQuestProps) {
   const [activeTab, setActiveTab] = useState<"today" | "history">("today");
   const [historyList, setHistoryList] = useState<Question[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
+  const [answerReactionOpen, setAnswerReactionOpen] = useState<boolean>(false);
 
   const [vaultQuestions, setVaultQuestions] = useState<VaultQuestion[]>([]);
   const [showVault, setShowVault] = useState<boolean>(false);
@@ -467,23 +469,24 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                         "{partnerAnswer}"
                       </div>
 
-                      {/* React to your partner's answer */}
-                      <div className="mt-2.5 flex items-center gap-1 bg-natural-card border border-natural-border rounded-full p-1 w-fit" title={`React to ${session.partnerName}'s answer`}>
-                        {["❤️", "😂", "🥹", "😮", "🔥"].map((reaction) => (
-                          <button
-                            id={`answer-react-${reaction}`}
-                            key={reaction}
-                            type="button"
-                            onClick={() => handleReactToAnswer(reaction)}
-                            className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all active:scale-125 cursor-pointer hover:scale-110 ${
-                              myReactionToPartner === reaction ? "bg-natural-card-darker border border-natural-border shadow-inner" : "hover:bg-black/5"
-                            }`}
-                            title={`React with ${reaction}`}
-                          >
-                            {reaction}
-                          </button>
-                        ))}
-                      </div>
+                      {/* React to your partner's answer — opens the full picker */}
+                      <button
+                        id="btn-answer-react-trigger"
+                        type="button"
+                        onClick={() => setAnswerReactionOpen(true)}
+                        className="mt-2.5 flex items-center gap-1.5 text-xs text-natural-text/70 bg-natural-card hover:bg-natural-card-darker border border-natural-border rounded-full px-2.5 py-1.5 cursor-pointer transition-all"
+                        title={`React to ${session.partnerName}'s answer`}
+                      >
+                        {myReactionToPartner ? (
+                          <>
+                            <span className="text-base leading-none">{myReactionToPartner}</span> You reacted
+                          </>
+                        ) : (
+                          <>
+                            <SmilePlus className="w-3.5 h-3.5" /> React
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -750,6 +753,21 @@ export default function DailyQuest({ session }: DailyQuestProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Reaction picker for your partner's answer */}
+      <ReactionPicker
+        open={answerReactionOpen}
+        currentReaction={myReactionToPartner}
+        onSelect={(emoji) => {
+          handleReactToAnswer(emoji);
+          setAnswerReactionOpen(false);
+        }}
+        onClose={() => setAnswerReactionOpen(false)}
+        onClear={() => {
+          if (myReactionToPartner) handleReactToAnswer(myReactionToPartner);
+          setAnswerReactionOpen(false);
+        }}
+      />
     </div>
   );
 }
