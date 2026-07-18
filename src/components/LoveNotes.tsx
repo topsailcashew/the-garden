@@ -224,6 +224,7 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteLimit, setNoteLimit] = useState<number>(NOTES_PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [noteFilter, setNoteFilter] = useState<"all" | "mine" | "partner" | "starred">("all");
   const [reactionPickerNoteId, setReactionPickerNoteId] = useState<string | null>(null);
   const [content, setContent] = useState<string>("");
   const [paperType, setPaperType] = useState<Note["paperType"]>("rose");
@@ -454,6 +455,16 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
     }
   };
 
+  const handleToggleStar = async (noteId: string, current?: boolean) => {
+    try {
+      const noteRef = doc(db, "rooms", session.roomId, "notes", noteId);
+      await updateDoc(noteRef, { starred: !current });
+    } catch (err) {
+      console.error("Error starring note:", err);
+      showToast("Failed to update favorite. Please try again.");
+    }
+  };
+
   const handleDeleteNote = async (noteId: string) => {
     const confirmed = await confirm({
       title: "Delete this note?",
@@ -499,9 +510,15 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
     }
   };
 
-  const filteredNotes = searchQuery.trim()
-    ? notes.filter((n) => n.content.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-    : notes;
+  const q = searchQuery.trim().toLowerCase();
+  const filteredNotes = notes.filter((n) => {
+    if (q && !n.content.toLowerCase().includes(q)) return false;
+    if (noteFilter === "mine" && n.sender !== session.role) return false;
+    if (noteFilter === "partner" && n.sender === session.role) return false;
+    if (noteFilter === "starred" && !n.starred) return false;
+    return true;
+  });
+  const starredCount = notes.filter((n) => n.starred).length;
 
   // Nudge the composer's placeholder based on the partner's mood today, so
   // the note you write is more likely to actually meet them where they're at.
@@ -537,6 +554,7 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
         onClick={() => isLocked && handleOpenNote(note)}
         className={`border rounded-2xl p-5 shadow-sm relative transition-all overflow-hidden flex flex-col justify-between min-h-[160px] ${
           style.bg
@@ -565,6 +583,17 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
               </span>
             )}
             <span className="text-xs font-serif italic text-stone-400">{formatNoteTime(note.createdAt)}</span>
+            <button
+              id={`btn-star-note-${note.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleStar(note.id, note.starred);
+              }}
+              className={`transition-all cursor-pointer ${note.starred ? "text-amber-400 hover:text-amber-500" : "text-stone-400 hover:text-amber-400"}`}
+              title={note.starred ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Star className="w-3.5 h-3.5" fill={note.starred ? "currentColor" : "none"} />
+            </button>
             {isOwn && (
               <button
                 id={`btn-delete-note-${note.id}`}
@@ -1007,16 +1036,40 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
       {/* Notes Board */}
       <div>
           {notes.length > 0 && (
-            <div className="relative mb-4">
-              <Search className="w-3.5 h-3.5 text-natural-text/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                id="notes-search-input"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search loaded notes..."
-                className="w-full bg-white border border-natural-border rounded-xl py-2 pl-9 pr-3.5 text-xs text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none placeholder:text-natural-text/40"
-              />
+            <div className="mb-4 space-y-2.5">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-natural-text/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="notes-search-input"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search loaded notes..."
+                  className="w-full bg-white border border-natural-border rounded-xl py-2 pl-9 pr-3.5 text-xs text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none placeholder:text-natural-text/40"
+                />
+              </div>
+              {/* Quick filters — by author or favorites, so meaningful notes stay findable */}
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { key: "all", label: "All" },
+                  { key: "mine", label: "Yours" },
+                  { key: "partner", label: `${session.partnerName}'s` },
+                  { key: "starred", label: `★ Starred${starredCount ? ` (${starredCount})` : ""}` }
+                ] as const).map((f) => (
+                  <button
+                    id={`notes-filter-${f.key}`}
+                    key={f.key}
+                    onClick={() => setNoteFilter(f.key)}
+                    className={`text-[11px] font-medium px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                      noteFilter === f.key
+                        ? "bg-natural-olive text-white border-natural-olive"
+                        : "bg-white text-natural-text/60 border-natural-border hover:bg-natural-card"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1028,9 +1081,19 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
             </div>
           ) : filteredNotes.length === 0 ? (
             <div className="bg-white border border-dashed border-natural-border rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[200px] card-shadow">
-              <p className="text-sm font-serif font-light text-natural-text">No notes match "{searchQuery}".</p>
+              <p className="text-sm font-serif font-light text-natural-text">
+                {searchQuery.trim()
+                  ? `No notes match "${searchQuery}".`
+                  : noteFilter === "starred"
+                    ? "No starred notes yet."
+                    : "No notes here yet."}
+              </p>
               <p className="text-xs text-natural-text/50 mt-1">
-                {notes.length >= noteLimit ? "Try loading more notes below, or a different search term." : "Try a different search term."}
+                {noteFilter === "starred"
+                  ? "Tap the star on any note to keep it here."
+                  : notes.length >= noteLimit
+                    ? "Try loading more notes below, or a different filter."
+                    : "Try a different search term or filter."}
               </p>
             </div>
           ) : (

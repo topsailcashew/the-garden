@@ -18,6 +18,15 @@
   --color-natural-terracotta-hover: #B56548;
   --color-natural-olive: #5A5A40;
   --color-natural-olive-hover: #484833;
+
+  /* Quick, subtle entrance used across cards and headers. Kept short so tab
+     switches feel instant rather than "half-loaded". */
+  --animate-fade-in: fade-in 0.2s ease-out both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @utility card-shadow {

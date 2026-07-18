@@ -13,6 +13,21 @@ interface DailyQuestProps {
   skinToneMod?: string;
 }
 
+// Compact relative time ("just now", "2 hours ago") from an ISO timestamp.
+function timeAgo(iso?: string): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return "";
+  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} min${mins > 1 ? "s" : ""} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs > 1 ? "s" : ""} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days > 1 ? "s" : ""} ago`;
+}
+
 export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProps) {
   const confirm = useConfirm();
   const [todayQuestion, setTodayQuestion] = useState<Question | null>(null);
@@ -149,6 +164,7 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
   
   const myAnswer = session.role === "boy" ? todayQuestion.boyAnswer : todayQuestion.girlAnswer;
   const partnerAnswer = session.role === "boy" ? todayQuestion.girlAnswer : todayQuestion.boyAnswer;
+  const partnerAnsweredAt = session.role === "boy" ? todayQuestion.girlAnsweredAt : todayQuestion.boyAnsweredAt;
 
   // Reactions live on the answers, not the question. The reaction on MY answer
   // was left by my partner (read-only to me); the reaction I give lands on my
@@ -429,7 +445,11 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
                     <span className="text-xs font-bold text-natural-text/70 uppercase">
                       {session.partnerName}'s Answer
                     </span>
-                    {hasPartnerAnswered ? (
+                    {!hasIAnswered && hasPartnerAnswered ? (
+                      <span className="text-[10px] bg-natural-terracotta/15 border border-natural-terracotta/30 text-natural-terracotta font-bold px-2.5 py-0.5 rounded-full">
+                        ✨ Ready to unlock
+                      </span>
+                    ) : hasPartnerAnswered ? (
                       <span className="text-[10px] bg-natural-card border border-natural-border text-natural-olive font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                         <Eye className="w-3 h-3" /> Revealed
                       </span>
@@ -442,14 +462,27 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
 
                   {!hasIAnswered ? (
                     // Locked state: I haven't answered
-                    <div className="flex-1 flex flex-col items-center justify-center py-6 text-center bg-natural-card border border-natural-border rounded-xl p-4 space-y-2 min-h-[140px]">
+                    <div className={`flex-1 flex flex-col items-center justify-center py-6 text-center border rounded-xl p-4 space-y-2 min-h-[140px] ${
+                      hasPartnerAnswered ? "bg-natural-terracotta/[0.06] border-natural-terracotta/25" : "bg-natural-card border-natural-border"
+                    }`}>
                       <div className="w-10 h-10 bg-natural-card-darker text-natural-terracotta rounded-full flex items-center justify-center">
                         <Lock className="w-5 h-5" />
                       </div>
-                      <h4 className="text-xs font-semibold text-natural-text font-serif italic">Response Locked</h4>
-                      <p className="text-[10px] text-natural-text/50 max-w-xs leading-normal">
-                        Submit your own answer to unlock {session.partnerName}'s thoughts!
-                      </p>
+                      {hasPartnerAnswered ? (
+                        <>
+                          <h4 className="text-xs font-semibold text-natural-terracotta font-serif italic">{session.partnerName} answered {timeAgo(partnerAnsweredAt)} — your turn!</h4>
+                          <p className="text-[10px] text-natural-text/50 max-w-xs leading-normal">
+                            {session.partnerName}'s response is waiting behind this lock. Submit yours to reveal it.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <h4 className="text-xs font-semibold text-natural-text font-serif italic">Response Locked</h4>
+                          <p className="text-[10px] text-natural-text/50 max-w-xs leading-normal">
+                            Be the first to answer today — {session.partnerName} hasn't checked in yet. You'll both reveal together.
+                          </p>
+                        </>
+                      )}
                     </div>
                   ) : !hasPartnerAnswered ? (
                     // Waiting state: I answered but partner hasn't

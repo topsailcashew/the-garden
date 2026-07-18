@@ -376,7 +376,7 @@ export default function App() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 space-y-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 pb-28 space-y-6">
         
         {/* Navigation Tabs Bar */}
         <div className="flex bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm overflow-x-auto whitespace-nowrap scrollbar-none">
@@ -427,7 +427,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-8 flex justify-between items-center text-[10px] uppercase tracking-[0.3em] opacity-60 border-t border-natural-border pt-6 max-w-6xl w-full mx-auto px-6 pb-8 select-none">
+      <footer className="mt-8 flex justify-between items-center text-[10px] uppercase tracking-[0.3em] opacity-60 border-t border-natural-border pt-6 max-w-6xl w-full mx-auto px-6 pb-28 select-none">
         <span>
           {roomCreatedAt
             ? `Est. ${new Date(roomCreatedAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}`

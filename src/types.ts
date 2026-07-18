@@ -19,6 +19,7 @@ export interface Note {
   emoji?: string; // Original wax seal chosen by the sender, set at creation
   reactionEmoji?: string; // Recipient's reaction seal, stacked alongside the original
   imageUrl?: string; // Attached photo, if any
+  starred?: boolean; // Favorited by either partner, for quick filtering
 }
 
 export interface Question {
