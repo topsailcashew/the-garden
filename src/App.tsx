@@ -10,6 +10,7 @@ import DatePlanner from "./components/DatePlanner";
 import { useConfirm } from "./components/ConfirmDialog";
 import { useToast } from "./components/Toast";
 import { Heart, Mail, Sparkles, Calendar, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
+import { SKIN_TONES, withTone, stripTone, loadSkinToneMod, saveSkinToneKey } from "./skinTone";
 
 const avatarOptions = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "🤴", "👸", "🦊", "🐻", "🐰", "🌻", "🌙"];
 
@@ -26,6 +27,7 @@ export default function App() {
   const [nameInput, setNameInput] = useState<string>("");
   const [savingName, setSavingName] = useState<boolean>(false);
   const [activeHug, setActiveHug] = useState<{ from: string } | null>(null);
+  const [skinToneMod, setSkinToneMod] = useState<string>(() => loadSkinToneMod());
 
   useEffect(() => {
     // Check if user session exists in local storage
@@ -154,6 +156,18 @@ export default function App() {
     }
   };
 
+  const handleSetSkinTone = async (key: string, mod: string) => {
+    saveSkinToneKey(key);
+    setSkinToneMod(mod);
+    // Re-tone the current avatar so the change is reflected immediately for
+    // people avatars (animals/objects are left untouched by withTone).
+    if (session) {
+      const current = session.role === "boy" ? boyAvatar : girlAvatar;
+      const retoned = withTone(current, mod);
+      if (retoned !== current) handleSetAvatar(retoned);
+    }
+  };
+
   const handleSendHug = async () => {
     if (!session) return;
     try {
@@ -273,22 +287,47 @@ export default function App() {
                     <div className="border-t border-natural-border mt-2 pt-3">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-natural-text/40 mb-1.5">Your Avatar</p>
                       <div className="flex flex-wrap gap-1 mb-1">
-                        {avatarOptions.map((a) => (
+                        {avatarOptions.map((a) => {
+                          const toned = withTone(a, skinToneMod);
+                          return (
+                            <button
+                              id={`avatar-option-${a}`}
+                              key={a}
+                              onClick={() => handleSetAvatar(toned)}
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all cursor-pointer ${
+                                stripTone(myAvatar) === a
+                                  ? "bg-natural-card-darker scale-110 border border-natural-border shadow-sm"
+                                  : "hover:bg-natural-card"
+                              }`}
+                              title={`Use ${toned} as your avatar`}
+                            >
+                              {toned}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-natural-border mt-2 pt-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-natural-text/40 mb-1.5">Skin Tone</p>
+                      <div className="flex flex-wrap gap-1">
+                        {SKIN_TONES.map((t) => (
                           <button
-                            id={`avatar-option-${a}`}
-                            key={a}
-                            onClick={() => handleSetAvatar(a)}
+                            id={`skin-tone-${t.key}`}
+                            key={t.key}
+                            onClick={() => handleSetSkinTone(t.key, t.mod)}
                             className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all cursor-pointer ${
-                              myAvatar === a
+                              skinToneMod === t.mod
                                 ? "bg-natural-card-darker scale-110 border border-natural-border shadow-sm"
                                 : "hover:bg-natural-card"
                             }`}
-                            title={`Use ${a} as your avatar`}
+                            title={t.label}
                           >
-                            {a}
+                            {t.swatch}
                           </button>
                         ))}
                       </div>
+                      <p className="text-[9px] text-natural-text/40 mt-1.5 leading-relaxed">Applies to avatars, reactions & hand emojis that support skin tone.</p>
                     </div>
 
                     <div className="border-t border-natural-border mt-2 pt-3">
@@ -381,8 +420,8 @@ export default function App() {
 
         {/* Tab Content Panel */}
         <div className="min-h-[400px]">
-          {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} onSendHug={handleSendHug} />}
-          {activeTab === "quest" && <DailyQuest session={session} />}
+          {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} onSendHug={handleSendHug} skinToneMod={skinToneMod} />}
+          {activeTab === "quest" && <DailyQuest session={session} skinToneMod={skinToneMod} />}
           {activeTab === "dates" && <DatePlanner session={session} />}
         </div>
       </main>

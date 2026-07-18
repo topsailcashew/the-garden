@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
+import { withTone, stripTone } from "../skinTone";
 
 export const ALL_REACTIONS = [
   "❤️", "🥰", "😍", "🥹", "😂", "🤗",
@@ -14,11 +15,12 @@ interface ReactionPickerProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
   onClear?: () => void;
+  skinToneMod?: string; // Applied to hand-gesture reactions that support it
 }
 
 // Shared fullscreen reaction picker with a frosted-glass panel. Selecting a
 // reaction fires onSelect (the caller is expected to close it immediately).
-export default function ReactionPicker({ open, currentReaction, onSelect, onClose, onClear }: ReactionPickerProps) {
+export default function ReactionPicker({ open, currentReaction, onSelect, onClose, onClear, skinToneMod = "" }: ReactionPickerProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -50,21 +52,25 @@ export default function ReactionPicker({ open, currentReaction, onSelect, onClos
             </div>
 
             <div className="grid grid-cols-6 gap-1.5">
-              {ALL_REACTIONS.map((reaction) => (
-                <button
-                  id={`picker-react-${reaction}`}
-                  key={reaction}
-                  onClick={() => onSelect(reaction)}
-                  className={`aspect-square rounded-xl flex items-center justify-center text-xl transition-all active:scale-125 cursor-pointer hover:scale-110 ${
-                    currentReaction === reaction
-                      ? "bg-natural-olive/25 border border-natural-olive/40 shadow-inner"
-                      : "bg-white/40 hover:bg-white/80"
-                  }`}
-                  title={`React with ${reaction}`}
-                >
-                  {reaction}
-                </button>
-              ))}
+              {ALL_REACTIONS.map((reaction) => {
+                const toned = withTone(reaction, skinToneMod);
+                const isSelected = stripTone(currentReaction || "") === reaction;
+                return (
+                  <button
+                    id={`picker-react-${reaction}`}
+                    key={reaction}
+                    onClick={() => onSelect(toned)}
+                    className={`aspect-square rounded-xl flex items-center justify-center text-xl transition-all active:scale-125 cursor-pointer hover:scale-110 ${
+                      isSelected
+                        ? "bg-natural-olive/25 border border-natural-olive/40 shadow-inner"
+                        : "bg-white/40 hover:bg-white/80"
+                    }`}
+                    title={`React with ${toned}`}
+                  >
+                    {toned}
+                  </button>
+                );
+              })}
             </div>
 
             {currentReaction && onClear && (

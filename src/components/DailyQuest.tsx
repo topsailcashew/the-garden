@@ -10,9 +10,10 @@ import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, 
 
 interface DailyQuestProps {
   session: UserSession;
+  skinToneMod?: string;
 }
 
-export default function DailyQuest({ session }: DailyQuestProps) {
+export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProps) {
   const confirm = useConfirm();
   const [todayQuestion, setTodayQuestion] = useState<Question | null>(null);
   const [answerInput, setAnswerInput] = useState<string>("");
@@ -604,6 +605,12 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                         <p className="text-xs text-natural-text leading-relaxed font-serif italic">
                           {histBoyAnswered ? `"${hist.boyAnswer}"` : "Not answered"}
                         </p>
+                        {hist.boyAnswerReaction && (
+                          <div className="mt-2 inline-flex items-center gap-1 bg-white border border-natural-border rounded-full pl-1 pr-2 py-0.5">
+                            <span className="text-sm">{hist.boyAnswerReaction}</span>
+                            <span className="text-[9px] font-bold text-natural-text/40 uppercase tracking-wide">Reacted</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Girl Answer */}
@@ -614,6 +621,12 @@ export default function DailyQuest({ session }: DailyQuestProps) {
                         <p className="text-xs text-natural-text leading-relaxed font-serif italic">
                           {histGirlAnswered ? `"${hist.girlAnswer}"` : "Not answered"}
                         </p>
+                        {hist.girlAnswerReaction && (
+                          <div className="mt-2 inline-flex items-center gap-1 bg-white border border-natural-border rounded-full pl-1 pr-2 py-0.5">
+                            <span className="text-sm">{hist.girlAnswerReaction}</span>
+                            <span className="text-[9px] font-bold text-natural-text/40 uppercase tracking-wide">Reacted</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -757,6 +770,7 @@ export default function DailyQuest({ session }: DailyQuestProps) {
       {/* Reaction picker for your partner's answer */}
       <ReactionPicker
         open={answerReactionOpen}
+        skinToneMod={skinToneMod}
         currentReaction={myReactionToPartner}
         onSelect={(emoji) => {
           handleReactToAnswer(emoji);

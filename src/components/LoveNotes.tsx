@@ -6,6 +6,7 @@ import { Note, MoodEntry, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
 import ReactionPicker from "./ReactionPicker";
+import { withTone, stripTone } from "../skinTone";
 import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check } from "lucide-react";
 
 const NOTES_PAGE_SIZE = 30;
@@ -68,6 +69,7 @@ interface LoveNotesProps {
   session: UserSession;
   avatars?: { boy: string; girl: string };
   onSendHug?: () => void;
+  skinToneMod?: string;
 }
 
 interface MoodOption {
@@ -214,9 +216,9 @@ const moodOptions: MoodOption[] = [
   }
 ];
 
-const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === emoji);
+const getMoodOption = (emoji?: string) => moodOptions.find((m) => m.emoji === stripTone(emoji || ""));
 
-export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProps) {
+export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "" }: LoveNotesProps) {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [notes, setNotes] = useState<Note[]>([]);
@@ -599,7 +601,9 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
               />
             )}
             {note.content && (
-              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words pr-2">
+              <p className={`leading-relaxed whitespace-pre-wrap break-words pr-2 ${
+                note.paperType === "rose" || note.paperType === "sticky" ? "text-base" : "text-sm"
+              }`}>
                 {note.content}
               </p>
             )}
@@ -614,7 +618,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
                   e.stopPropagation();
                   setReactionPickerNoteId(note.id);
                 }}
-                className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] hover:bg-black/[0.07] rounded-full pl-1.5 pr-2.5 py-1 not-italic cursor-pointer transition-all flex-shrink-0"
+                className="flex items-center gap-1.5 text-xs text-stone-600 bg-black/[0.03] hover:bg-black/[0.07] rounded-full pl-1.5 pr-2.5 py-1 not-italic font-sans cursor-pointer transition-all flex-shrink-0"
                 title="Tap to pick a reaction"
               >
                 <div className="flex items-center">
@@ -635,7 +639,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
                   e.stopPropagation();
                   setReactionPickerNoteId(note.id);
                 }}
-                className="flex items-center gap-1 text-xs text-stone-600 bg-white/70 hover:bg-white border border-stone-200/60 rounded-full px-2.5 py-1 not-italic cursor-pointer transition-all flex-shrink-0"
+                className="flex items-center gap-1 text-xs text-stone-600 bg-white/70 hover:bg-white border border-stone-200/60 rounded-full px-2.5 py-1 not-italic font-sans cursor-pointer transition-all flex-shrink-0"
                 title="React to this note"
               >
                 <SmilePlus className="w-3.5 h-3.5" /> React
@@ -726,14 +730,15 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
         {/* Mood picker — spread evenly across the full width */}
         <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 justify-items-center relative">
           {moodOptions.map(({ emoji: moodEmoji, label, color }) => {
-            const isSelected = myMood?.emoji === moodEmoji;
+            const tonedMood = withTone(moodEmoji, skinToneMod);
+            const isSelected = stripTone(myMood?.emoji || "") === moodEmoji;
             return (
               <motion.button
                 id={`mood-option-${moodEmoji}`}
                 key={moodEmoji}
                 type="button"
                 disabled={savingMood}
-                onClick={() => handleSetMood(moodEmoji)}
+                onClick={() => handleSetMood(tonedMood)}
                 whileHover={{ scale: 1.15, rotate: 8 }}
                 whileTap={{ scale: 0.85, rotate: -8 }}
                 className="w-11 h-11 rounded-full flex items-center justify-center text-xl transition-colors cursor-pointer disabled:opacity-50 border-2"
@@ -743,7 +748,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
                 }}
                 title={label}
               >
-                {moodEmoji}
+                {tonedMood}
               </motion.button>
             );
           })}
@@ -801,11 +806,12 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
             ]
           }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          whileHover={{ scale: 1.06, y: 0 }}
-          whileTap={{ scale: 0.92 }}
-          className="bg-natural-olive hover:bg-natural-olive-hover text-white rounded-full py-3.5 px-5 flex items-center gap-2 font-serif italic text-sm cursor-pointer"
+          whileHover={{ scale: 1.1, y: 0 }}
+          whileTap={{ scale: 0.85 }}
+          className="w-14 h-14 rounded-full bg-natural-olive hover:bg-natural-olive-hover text-white shadow-lg flex items-center justify-center cursor-pointer"
+          title="Write a note"
         >
-          <PenTool className="w-4 h-4" /> Write a Note
+          <PenTool className="w-5 h-5" />
         </motion.button>
       </div>
 
@@ -1053,6 +1059,7 @@ export default function LoveNotes({ session, avatars, onSendHug }: LoveNotesProp
       {/* Full reaction picker — opens when the seal stack / React button is tapped */}
       <ReactionPicker
         open={!!reactionPickerNote}
+        skinToneMod={skinToneMod}
         currentReaction={reactionPickerNote?.reactionEmoji}
         onSelect={(emoji) => {
           if (reactionPickerNote) handleReactToNote(reactionPickerNote.id, emoji, reactionPickerNote.reactionEmoji);
