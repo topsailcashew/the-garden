@@ -22,6 +22,18 @@ export interface Note {
   starred?: boolean; // Favorited by either partner, for quick filtering
 }
 
+// Long-form correspondence, kept separate from the quick notes board so it can
+// hold full letters rather than 500-character messages.
+export interface Letter {
+  id: string;
+  sender: "boy" | "girl";
+  title: string;
+  content: string;
+  createdAt: any; // ISO string
+  read: boolean;
+  starred?: boolean;
+}
+
 export interface Question {
   id: string; // e.g., "q_1", "q_2", etc.
   questionText: string;

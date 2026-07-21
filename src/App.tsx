@@ -7,9 +7,10 @@ import Onboarding from "./components/Onboarding";
 import LoveNotes from "./components/LoveNotes";
 import DailyQuest from "./components/DailyQuest";
 import DatePlanner from "./components/DatePlanner";
+import Letters from "./components/Letters";
 import { useConfirm } from "./components/ConfirmDialog";
 import { useToast } from "./components/Toast";
-import { Heart, Mail, Sparkles, Calendar, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
+import { Heart, Mail, Sparkles, Calendar, Feather, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
 import { SKIN_TONES, withTone, stripTone, loadSkinToneMod, saveSkinToneKey } from "./skinTone";
 
 const avatarOptions = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "🤴", "👸", "🦊", "🐻", "🐰", "🌻", "🌙"];
@@ -18,7 +19,7 @@ export default function App() {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [session, setSession] = useState<UserSession | null>(null);
-  const [activeTab, setActiveTab] = useState<"notes" | "quest" | "dates">("notes");
+  const [activeTab, setActiveTab] = useState<"notes" | "letters" | "quest" | "dates">("notes");
   const [copied, setCopied] = useState<boolean>(false);
   const [roomMeta, setRoomMeta] = useState<Partial<Room> | null>(null);
   const [codeRevealed, setCodeRevealed] = useState<boolean>(false);
@@ -393,6 +394,18 @@ export default function App() {
           </button>
 
           <button
+            id="nav-letters"
+            onClick={() => setActiveTab("letters")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-medium font-serif italic transition-all cursor-pointer ${
+              activeTab === "letters"
+                ? "bg-natural-olive text-white shadow-sm font-semibold"
+                : "text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
+            }`}
+          >
+            <Feather className="w-4 h-4" /> Writing Desk
+          </button>
+
+          <button
             id="nav-quest"
             onClick={() => setActiveTab("quest")}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-medium font-serif italic transition-all cursor-pointer ${
@@ -421,6 +434,7 @@ export default function App() {
         {/* Tab Content Panel */}
         <div className="min-h-[400px]">
           {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} onSendHug={handleSendHug} skinToneMod={skinToneMod} />}
+          {activeTab === "letters" && <Letters session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
           {activeTab === "quest" && <DailyQuest session={session} skinToneMod={skinToneMod} />}
           {activeTab === "dates" && <DatePlanner session={session} />}
         </div>
