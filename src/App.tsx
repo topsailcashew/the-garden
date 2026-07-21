@@ -15,11 +15,21 @@ import { SKIN_TONES, withTone, stripTone, loadSkinToneMod, saveSkinToneKey } fro
 
 const avatarOptions = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "🤴", "👸", "🦊", "🐻", "🐰", "🌻", "🌙"];
 
+// The nav only spells out the section you're in; the rest collapse to icon pills.
+const navTabs = [
+  { key: "notes", label: "Notes Board", Icon: Mail },
+  { key: "letters", label: "Writing Desk", Icon: Feather },
+  { key: "quest", label: "Daily Quest", Icon: Sparkles },
+  { key: "dates", label: "Date Planner", Icon: Calendar }
+] as const;
+
+type TabKey = (typeof navTabs)[number]["key"];
+
 export default function App() {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [session, setSession] = useState<UserSession | null>(null);
-  const [activeTab, setActiveTab] = useState<"notes" | "letters" | "quest" | "dates">("notes");
+  const [activeTab, setActiveTab] = useState<TabKey>("notes");
   const [copied, setCopied] = useState<boolean>(false);
   const [roomMeta, setRoomMeta] = useState<Partial<Room> | null>(null);
   const [codeRevealed, setCodeRevealed] = useState<boolean>(false);
@@ -380,55 +390,28 @@ export default function App() {
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 pb-28 space-y-6">
         
         {/* Navigation Tabs Bar */}
-        <div className="flex bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm overflow-x-auto whitespace-nowrap scrollbar-none">
-          <button
-            id="nav-notes"
-            onClick={() => setActiveTab("notes")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-medium font-serif italic transition-all cursor-pointer ${
-              activeTab === "notes"
-                ? "bg-natural-olive text-white shadow-sm font-semibold"
-                : "text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
-            }`}
-          >
-            <Mail className="w-4 h-4" /> Notes Board
-          </button>
-
-          <button
-            id="nav-letters"
-            onClick={() => setActiveTab("letters")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-medium font-serif italic transition-all cursor-pointer ${
-              activeTab === "letters"
-                ? "bg-natural-olive text-white shadow-sm font-semibold"
-                : "text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
-            }`}
-          >
-            <Feather className="w-4 h-4" /> Writing Desk
-          </button>
-
-          <button
-            id="nav-quest"
-            onClick={() => setActiveTab("quest")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-medium font-serif italic transition-all cursor-pointer ${
-              activeTab === "quest"
-                ? "bg-natural-olive text-white shadow-sm font-semibold"
-                : "text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
-            }`}
-          >
-            <Sparkles className="w-4 h-4" /> Daily Quest
-          </button>
-
-          <button
-            id="nav-dates"
-            onClick={() => setActiveTab("dates")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-medium font-serif italic transition-all cursor-pointer ${
-              activeTab === "dates"
-                ? "bg-natural-olive text-white shadow-sm font-semibold"
-                : "text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
-            }`}
-          >
-            <Calendar className="w-4 h-4" /> Date Planner
-          </button>
-
+        <div className="flex items-center justify-center gap-1.5 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm">
+          {navTabs.map(({ key, label, Icon }) => {
+            const isActive = activeTab === key;
+            return (
+              <button
+                id={`nav-${key}`}
+                key={key}
+                onClick={() => setActiveTab(key)}
+                title={label}
+                aria-label={label}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex items-center justify-center py-3 rounded-xl text-xs font-medium font-serif italic cursor-pointer transition-colors ${
+                  isActive
+                    ? "px-5 bg-natural-olive text-white shadow-sm font-semibold"
+                    : "px-4 text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {isActive && <span className="pl-2 whitespace-nowrap">{label}</span>}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab Content Panel */}
