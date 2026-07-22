@@ -18,8 +18,8 @@ const avatarOptions = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "🤴", 
 // The nav only spells out the section you're in; the rest collapse to icon pills.
 const navTabs = [
   { key: "notes", label: "Notes Board", Icon: Mail },
-  { key: "letters", label: "Writing Desk", Icon: Feather },
   { key: "quest", label: "Daily Quest", Icon: Sparkles },
+  { key: "letters", label: "Writing Desk", Icon: Feather },
   { key: "dates", label: "Date Planner", Icon: Calendar }
 ] as const;
 
