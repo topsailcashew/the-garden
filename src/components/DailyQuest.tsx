@@ -6,7 +6,7 @@ import { Question, VaultQuestion, UserSession } from "../types";
 import { getQuestionOfToday } from "../data/questions";
 import { useConfirm } from "./ConfirmDialog";
 import ReactionPicker from "./ReactionPicker";
-import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart, Archive, X, Trash2, Plus, SmilePlus } from "lucide-react";
+import { Lock, Eye, Send, Sparkles, AlertCircle, HelpCircle, History, Calendar, MessageSquareHeart, Archive, X, Trash2, Plus, SmilePlus, Pencil, Check } from "lucide-react";
 
 interface DailyQuestProps {
   session: UserSession;
@@ -40,6 +40,8 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
   const [historyList, setHistoryList] = useState<Question[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
   const [answerReactionOpen, setAnswerReactionOpen] = useState<boolean>(false);
+  const [isEditingAnswer, setIsEditingAnswer] = useState<boolean>(false);
+  const [editInput, setEditInput] = useState<string>("");
 
   const [vaultQuestions, setVaultQuestions] = useState<VaultQuestion[]>([]);
   const [showVault, setShowVault] = useState<boolean>(false);
@@ -58,6 +60,8 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
   const todayId = getTodayId();
 
   useEffect(() => {
+    // A new day (or room) means any in-progress answer edit no longer applies.
+    setIsEditingAnswer(false);
     // Real-time listener for today's question
     const qRef = doc(db, "rooms", session.roomId, "questions", todayId);
     // Local guard so the missing-doc branch only initializes once per mount/day
@@ -207,6 +211,34 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
     } catch (err: any) {
       console.error(err);
       setError("Failed to save answer. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const startEditingAnswer = () => {
+    setEditInput(myAnswer || "");
+    setError("");
+    setIsEditingAnswer(true);
+  };
+
+  const handleSaveEditedAnswer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editInput.trim()) return;
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const qRef = doc(db, "rooms", session.roomId, "questions", todayId);
+      // Only the answer text is revised; the original answered-at timestamp is
+      // preserved so "answered X ago" hints still reflect when they first replied.
+      const field = session.role === "boy" ? "boyAnswer" : "girlAnswer";
+      await updateDoc(qRef, { [field]: editInput.trim() });
+      setIsEditingAnswer(false);
+    } catch (err: any) {
+      console.error(err);
+      setError("Failed to update your answer. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -402,18 +434,63 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
                   </div>
 
                   {hasIAnswered ? (
-                    <div>
-                      <div className="bg-natural-card rounded-xl p-4 text-sm text-natural-text leading-relaxed font-serif italic min-h-[100px] border border-natural-border relative">
-                        <span className="text-3xl font-serif absolute top-1 right-2 text-natural-text/10">”</span>
-                        "{myAnswer}"
-                      </div>
-                      {reactionOnMyAnswer && (
-                        <div id="my-answer-reaction" className="mt-2 flex items-center gap-1.5 text-[10px] text-natural-text/60 font-serif italic">
-                          <span className="text-base not-italic">{reactionOnMyAnswer}</span>
-                          {session.partnerName} reacted to your answer
+                    isEditingAnswer ? (
+                      <form onSubmit={handleSaveEditedAnswer} className="space-y-3">
+                        <textarea
+                          id="edit-answer-textarea"
+                          value={editInput}
+                          onChange={(e) => setEditInput(e.target.value)}
+                          rows={4}
+                          maxLength={800}
+                          autoFocus
+                          className="w-full bg-natural-card border border-natural-border rounded-xl p-4 text-sm text-natural-text focus:ring-2 focus:ring-natural-olive/20 focus:outline-none placeholder:text-natural-text/40 resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            id="btn-save-answer"
+                            type="submit"
+                            disabled={isSubmitting || !editInput.trim()}
+                            className="flex-1 bg-natural-olive hover:bg-natural-olive-hover disabled:bg-natural-card-darker disabled:text-natural-text/40 text-white font-medium font-serif italic text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                          >
+                            <Check className="w-3.5 h-3.5" /> {isSubmitting ? "Saving..." : "Save Changes"}
+                          </button>
+                          <button
+                            id="btn-cancel-edit-answer"
+                            type="button"
+                            onClick={() => setIsEditingAnswer(false)}
+                            className="px-4 bg-natural-card hover:bg-natural-card-darker border border-natural-border text-natural-text/70 font-medium font-serif italic text-xs py-2.5 rounded-xl cursor-pointer transition-all"
+                          >
+                            Cancel
+                          </button>
                         </div>
-                      )}
-                    </div>
+                      </form>
+                    ) : (
+                      <div>
+                        <div className="bg-natural-card rounded-xl p-4 text-sm text-natural-text leading-relaxed font-serif italic min-h-[100px] border border-natural-border relative">
+                          <span className="text-3xl font-serif absolute top-1 right-2 text-natural-text/10">”</span>
+                          "{myAnswer}"
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          {reactionOnMyAnswer ? (
+                            <div id="my-answer-reaction" className="flex items-center gap-1.5 text-[10px] text-natural-text/60 font-serif italic">
+                              <span className="text-base not-italic">{reactionOnMyAnswer}</span>
+                              {session.partnerName} reacted to your answer
+                            </div>
+                          ) : (
+                            <span />
+                          )}
+                          <button
+                            id="btn-edit-answer"
+                            type="button"
+                            onClick={startEditingAnswer}
+                            className="flex items-center gap-1 text-[11px] text-natural-text/50 hover:text-natural-olive font-medium cursor-pointer transition-all flex-shrink-0"
+                            title="Edit your answer"
+                          >
+                            <Pencil className="w-3 h-3" /> Edit
+                          </button>
+                        </div>
+                      </div>
+                    )
                   ) : (
                     <form onSubmit={handleSendAnswer} className="space-y-3">
                       <textarea
