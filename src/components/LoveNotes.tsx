@@ -7,8 +7,9 @@ import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
 import ReactionPicker from "./ReactionPicker";
 import NoteCommentBox from "./NoteComment";
+import MusicShare from "./MusicShare";
 import { withTone, stripTone } from "../skinTone";
-import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check } from "lucide-react";
+import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check, Music } from "lucide-react";
 
 const NOTES_PAGE_SIZE = 30;
 
@@ -227,6 +228,7 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [noteFilter, setNoteFilter] = useState<"all" | "mine" | "partner" | "starred">("all");
   const [reactionPickerNoteId, setReactionPickerNoteId] = useState<string | null>(null);
+  const [isMusicOpen, setIsMusicOpen] = useState<boolean>(false);
   const [content, setContent] = useState<string>("");
   const [paperType, setPaperType] = useState<Note["paperType"]>("rose");
   const [emoji, setEmoji] = useState<string>("💌");
@@ -691,6 +693,9 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
 
   return (
     <div id="love-notes-root" className="space-y-6">
+      {/* Song sharing: alert banner (top) + composer/list modal (controlled by the FAB) */}
+      <MusicShare session={session} avatars={avatars} open={isMusicOpen} onClose={() => setIsMusicOpen(false)} />
+
       {/* Daily Mood Tracker */}
       <div id="mood-tracker" className="relative bg-white border border-natural-border rounded-[32px] p-5 card-shadow textured-bg animate-fade-in overflow-hidden">
         {/* Big faint decorative emoji in the corner, echoing whatever mood is winning today */}
@@ -809,7 +814,7 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
         )}
       </div>
 
-      {/* Floating action cluster, bottom-right: send a hug + write a note */}
+      {/* Floating action cluster, bottom-right: send a hug + share a song + write a note */}
       <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
         {onSendHug && (
           <motion.button
@@ -823,6 +828,17 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
             🤗
           </motion.button>
         )}
+
+        <motion.button
+          id="btn-share-song"
+          onClick={() => setIsMusicOpen(true)}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.85 }}
+          className="w-14 h-14 rounded-full bg-white border border-natural-border shadow-lg flex items-center justify-center text-natural-terracotta cursor-pointer"
+          title={`Send ${session.partnerName} a song`}
+        >
+          <Music className="w-6 h-6" />
+        </motion.button>
 
         <motion.button
           id="btn-open-composer"

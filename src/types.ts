@@ -39,6 +39,18 @@ export interface PrayerRequest {
   status: "praying" | "prayed" | "answered";
 }
 
+// A song one partner sends the other to listen to. Links are generated as
+// pre-filled searches on Spotify / YT Music from the title + artist.
+export interface SongShare {
+  id: string;
+  sender: "boy" | "girl";
+  title: string;
+  artist: string;
+  note?: string; // Optional message from the sender
+  createdAt: any; // ISO string
+  listened?: boolean; // Recipient marked it as heard
+}
+
 // A quick shared note — a to-do to tick off, or just a thought to share.
 export interface ScratchItem {
   id: string;
