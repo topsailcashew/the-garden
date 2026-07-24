@@ -47,6 +47,7 @@ export interface SongShare {
   title: string;
   artist: string;
   note?: string; // Optional message from the sender
+  artwork?: string; // Album art URL from the catalog lookup, if picked from search
   createdAt: any; // ISO string
   listened?: boolean; // Recipient marked it as heard
 }
