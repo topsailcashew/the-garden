@@ -20,6 +20,32 @@ export interface Note {
   reactionEmoji?: string; // Recipient's reaction seal, stacked alongside the original
   imageUrl?: string; // Attached photo, if any
   starred?: boolean; // Favorited by either partner, for quick filtering
+  comment?: NoteComment | null; // The single shared comment on this note
+  commentReactions?: { boy?: string; girl?: string }; // One emoji reaction per partner on the comment
+}
+
+export interface NoteComment {
+  author: "boy" | "girl";
+  text: string;
+  createdAt: string; // ISO
+}
+
+// A shared prayer request on the Prayer Wall.
+export interface PrayerRequest {
+  id: string;
+  author: "boy" | "girl";
+  text: string;
+  createdAt: any; // ISO string
+  status: "praying" | "prayed" | "answered";
+}
+
+// A quick shared note — a to-do to tick off, or just a thought to share.
+export interface ScratchItem {
+  id: string;
+  author: "boy" | "girl";
+  text: string;
+  createdAt: any; // ISO string
+  done: boolean;
 }
 
 // Long-form correspondence, kept separate from the quick notes board so it can

@@ -29,6 +29,15 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Hide the horizontal scrollbar on the nav / any scroll strip. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 @utility card-shadow {
   box-shadow: 0 10px 25px -5px rgba(90, 90, 64, 0.08);
 }

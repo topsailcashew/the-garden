@@ -35,6 +35,14 @@ service cloud.firestore {
       match /vault/{vaultId} {
         allow read, write: if true;
       }
+
+      match /prayers/{prayerId} {
+        allow read, write: if true;
+      }
+
+      match /scratch/{scratchId} {
+        allow read, write: if true;
+      }
     }
   }
 }

@@ -6,6 +6,7 @@ import { Note, MoodEntry, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
 import ReactionPicker from "./ReactionPicker";
+import NoteCommentBox from "./NoteComment";
 import { withTone, stripTone } from "../skinTone";
 import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check } from "lucide-react";
 
@@ -674,6 +675,9 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
                 <SmilePlus className="w-3.5 h-3.5" /> React
               </button>
             </div>
+
+            {/* One shared comment per note, with emoji reactions */}
+            <NoteCommentBox note={note} session={session} skinToneMod={skinToneMod} avatars={avatars} />
           </div>
         )}
 

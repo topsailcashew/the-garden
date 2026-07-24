@@ -8,9 +8,11 @@ import LoveNotes from "./components/LoveNotes";
 import DailyQuest from "./components/DailyQuest";
 import DatePlanner from "./components/DatePlanner";
 import Letters from "./components/Letters";
+import PrayerWall from "./components/PrayerWall";
+import Scratchpad from "./components/Scratchpad";
 import { useConfirm } from "./components/ConfirmDialog";
 import { useToast } from "./components/Toast";
-import { Heart, Mail, Sparkles, Calendar, Feather, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
+import { Heart, Mail, Sparkles, Calendar, Feather, HandHeart, StickyNote, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
 import { SKIN_TONES, withTone, stripTone, loadSkinToneMod, saveSkinToneKey } from "./skinTone";
 
 const avatarOptions = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "🤴", "👸", "🦊", "🐻", "🐰", "🌻", "🌙"];
@@ -20,6 +22,8 @@ const navTabs = [
   { key: "notes", label: "Notes Board", Icon: Mail },
   { key: "quest", label: "Daily Quest", Icon: Sparkles },
   { key: "letters", label: "Writing Desk", Icon: Feather },
+  { key: "prayer", label: "Prayer Wall", Icon: HandHeart },
+  { key: "scratch", label: "Scratchpad", Icon: StickyNote },
   { key: "dates", label: "Date Planner", Icon: Calendar }
 ] as const;
 
@@ -390,7 +394,7 @@ export default function App() {
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 pb-28 space-y-6">
         
         {/* Navigation Tabs Bar */}
-        <div className="flex items-center justify-center gap-1.5 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm">
+        <div className="flex items-center justify-start md:justify-center gap-1.5 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm overflow-x-auto scrollbar-none">
           {navTabs.map(({ key, label, Icon }) => {
             const isActive = activeTab === key;
             return (
@@ -401,7 +405,7 @@ export default function App() {
                 title={label}
                 aria-label={label}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex items-center justify-center py-3 rounded-xl text-xs font-medium font-serif italic cursor-pointer transition-colors ${
+                className={`flex flex-shrink-0 items-center justify-center py-3 rounded-xl text-xs font-medium font-serif italic cursor-pointer transition-colors ${
                   isActive
                     ? "px-5 bg-natural-olive text-white shadow-sm font-semibold"
                     : "px-4 text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
@@ -419,6 +423,8 @@ export default function App() {
           {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} onSendHug={handleSendHug} skinToneMod={skinToneMod} />}
           {activeTab === "letters" && <Letters session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
           {activeTab === "quest" && <DailyQuest session={session} skinToneMod={skinToneMod} />}
+          {activeTab === "prayer" && <PrayerWall session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
+          {activeTab === "scratch" && <Scratchpad session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
           {activeTab === "dates" && <DatePlanner session={session} />}
         </div>
       </main>
