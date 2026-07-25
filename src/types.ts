@@ -37,6 +37,9 @@ export interface PrayerRequest {
   text: string;
   createdAt: any; // ISO string
   status: "praying" | "prayed" | "answered";
+  reactions?: { boy?: string; girl?: string }; // One emoji reaction per partner
+  comment?: NoteComment | null; // Single shared comment
+  commentReactions?: { boy?: string; girl?: string };
 }
 
 // A song one partner sends the other to listen to. Links are generated as
@@ -71,6 +74,9 @@ export interface Letter {
   createdAt: any; // ISO string
   read: boolean;
   starred?: boolean;
+  reactions?: { boy?: string; girl?: string }; // One emoji reaction per partner
+  comment?: NoteComment | null; // Single shared comment
+  commentReactions?: { boy?: string; girl?: string };
 }
 
 export interface Question {

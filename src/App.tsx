@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { Room, UserSession } from "./types";
 import Onboarding from "./components/Onboarding";
 import LoveNotes from "./components/LoveNotes";
-import DailyQuest from "./components/DailyQuest";
-import DatePlanner from "./components/DatePlanner";
-import Letters from "./components/Letters";
-import PrayerWall from "./components/PrayerWall";
-import Scratchpad from "./components/Scratchpad";
+// Non-default tabs are code-split so they don't weigh down the initial load.
+const DailyQuest = lazy(() => import("./components/DailyQuest"));
+const DatePlanner = lazy(() => import("./components/DatePlanner"));
+const Letters = lazy(() => import("./components/Letters"));
+const PrayerWall = lazy(() => import("./components/PrayerWall"));
+const Scratchpad = lazy(() => import("./components/Scratchpad"));
 import { useConfirm } from "./components/ConfirmDialog";
 import { useToast } from "./components/Toast";
 import { Heart, Mail, Sparkles, Calendar, Feather, HandHeart, StickyNote, LogOut, Copy, Check, Eye, EyeOff, ChevronDown, Pencil, X as XIcon } from "lucide-react";
@@ -421,11 +422,15 @@ export default function App() {
         {/* Tab Content Panel */}
         <div className="min-h-[400px]">
           {activeTab === "notes" && <LoveNotes session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} onSendHug={handleSendHug} skinToneMod={skinToneMod} />}
-          {activeTab === "letters" && <Letters session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
-          {activeTab === "quest" && <DailyQuest session={session} skinToneMod={skinToneMod} />}
-          {activeTab === "prayer" && <PrayerWall session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
-          {activeTab === "scratch" && <Scratchpad session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
-          {activeTab === "dates" && <DatePlanner session={session} />}
+          {activeTab !== "notes" && (
+            <Suspense fallback={<div className="flex justify-center py-20"><div className="w-6 h-6 border-2 border-natural-border border-t-natural-olive rounded-full animate-spin" /></div>}>
+              {activeTab === "letters" && <Letters session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} skinToneMod={skinToneMod} />}
+              {activeTab === "quest" && <DailyQuest session={session} skinToneMod={skinToneMod} />}
+              {activeTab === "prayer" && <PrayerWall session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} skinToneMod={skinToneMod} />}
+              {activeTab === "scratch" && <Scratchpad session={session} avatars={{ boy: boyAvatar, girl: girlAvatar }} />}
+              {activeTab === "dates" && <DatePlanner session={session} />}
+            </Suspense>
+          )}
         </div>
       </main>
 

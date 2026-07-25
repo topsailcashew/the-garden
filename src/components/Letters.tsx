@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { Letter, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
+import ItemInteractions from "./ItemInteractions";
 import { Feather, X, Trash2, Loader2, Search, Star, BookOpen, Clock, Send, ChevronDown } from "lucide-react";
 
 const LETTERS_PAGE_SIZE = 12;
@@ -16,6 +17,7 @@ const WORDS_PER_MINUTE = 200;
 interface LettersProps {
   session: UserSession;
   avatars?: { boy: string; girl: string };
+  skinToneMod?: string;
 }
 
 const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).length : 0);
@@ -46,7 +48,7 @@ const formatShortDate = (iso: string) => {
   }
 };
 
-export default function Letters({ session, avatars }: LettersProps) {
+export default function Letters({ session, avatars, skinToneMod = "" }: LettersProps) {
   const { showToast } = useToast();
   const confirm = useConfirm();
 
@@ -555,6 +557,16 @@ export default function Letters({ session, avatars }: LettersProps) {
                     </button>
                   )}
                 </div>
+
+                <ItemInteractions
+                  roomId={session.roomId}
+                  collectionName="letters"
+                  docId={readingLetter.id}
+                  data={readingLetter}
+                  session={session}
+                  avatars={avatars}
+                  skinToneMod={skinToneMod}
+                />
               </div>
             </motion.div>
           </motion.div>

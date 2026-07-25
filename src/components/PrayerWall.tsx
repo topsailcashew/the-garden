@@ -5,11 +5,13 @@ import { db } from "../firebase";
 import { PrayerRequest, UserSession } from "../types";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
+import ItemInteractions from "./ItemInteractions";
 import { HandHeart, Send, Trash2, Loader2 } from "lucide-react";
 
 interface PrayerWallProps {
   session: UserSession;
   avatars?: { boy: string; girl: string };
+  skinToneMod?: string;
 }
 
 type Status = PrayerRequest["status"];
@@ -29,7 +31,7 @@ const formatDate = (iso: string) => {
   }
 };
 
-export default function PrayerWall({ session, avatars }: PrayerWallProps) {
+export default function PrayerWall({ session, avatars, skinToneMod = "" }: PrayerWallProps) {
   const { showToast } = useToast();
   const confirm = useConfirm();
 
@@ -252,6 +254,16 @@ export default function PrayerWall({ session, avatars }: PrayerWallProps) {
                       })}
                     </div>
                   </div>
+
+                  <ItemInteractions
+                    roomId={session.roomId}
+                    collectionName="prayers"
+                    docId={p.id}
+                    data={p}
+                    session={session}
+                    avatars={avatars}
+                    skinToneMod={skinToneMod}
+                  />
                 </motion.div>
               );
             })}

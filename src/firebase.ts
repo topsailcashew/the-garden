@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCs0W-A0IvOucRJgj-tue1JaUHNG_7Jsfo",
@@ -12,7 +12,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize with the custom Firestore database ID using getFirestore
-const db = getFirestore(app, "the-garden");
+// Persistent IndexedDB cache: subsequent loads render instantly from cache
+// while the network revalidates in the background, so the app feels snappy.
+const db = initializeFirestore(
+  app,
+  { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) },
+  "the-garden"
+);
 
 export { db };

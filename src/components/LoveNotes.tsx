@@ -224,6 +224,8 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [notes, setNotes] = useState<Note[]>([]);
+  const [notesLoading, setNotesLoading] = useState<boolean>(true);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [noteLimit, setNoteLimit] = useState<number>(NOTES_PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [noteFilter, setNoteFilter] = useState<"all" | "mine" | "partner" | "starred">("all");
@@ -300,9 +302,11 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
           fetchedNotes.push({ id: docSnap.id, ...docSnap.data() } as Note);
         });
         setNotes(fetchedNotes);
+        setNotesLoading(false);
       },
       (err) => {
         console.error("Error syncing notes:", err);
+        setNotesLoading(false);
         notifySyncError("your love notes");
       }
     );
@@ -629,7 +633,13 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
                 id={`note-image-${note.id}`}
                 src={note.imageUrl}
                 alt="Attached photo"
-                className="w-full rounded-xl mb-3 object-cover"
+                loading="lazy"
+                decoding="async"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxSrc(note.imageUrl!);
+                }}
+                className="w-full rounded-xl mb-3 object-cover cursor-zoom-in hover:brightness-95 transition-all"
               />
             )}
             {note.content && (
@@ -1093,7 +1103,21 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
             </div>
           )}
 
-          {notes.length === 0 ? (
+          {notesLoading && notes.length === 0 ? (
+            <div className="flex gap-4 items-start">
+              {Array.from({ length: columnCount }).map((_, ci) => (
+                <div key={ci} className="flex-1 min-w-0 flex flex-col gap-4">
+                  {[150, 210, 170].map((h, i) => (
+                    <div
+                      key={i}
+                      className="rounded-2xl bg-natural-card-darker/50 animate-pulse border border-natural-border/40"
+                      style={{ height: h }}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : notes.length === 0 ? (
             <div className="bg-white border border-dashed border-natural-border rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[300px] card-shadow">
               <div className="w-12 h-12 bg-natural-card-darker rounded-full flex items-center justify-center shadow-inner text-lg mb-3">✉️</div>
               <p className="text-sm font-serif font-light text-natural-text">The note board is currently quiet.</p>
@@ -1154,6 +1178,39 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
           setReactionPickerNoteId(null);
         }}
       />
+
+      {/* Photo lightbox — tap a note photo to view it full-size */}
+      <AnimatePresence>
+        {lightboxSrc && (
+          <motion.div
+            id="note-lightbox"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightboxSrc(null)}
+            className="fixed inset-0 z-[95] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out"
+          >
+            <button
+              id="btn-close-lightbox"
+              onClick={() => setLightboxSrc(null)}
+              className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full cursor-pointer transition-all"
+              title="Close"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <motion.img
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              src={lightboxSrc}
+              alt="Photo"
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-full max-h-full rounded-2xl object-contain shadow-2xl"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
