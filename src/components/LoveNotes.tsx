@@ -839,7 +839,7 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
         )}
       </AnimatePresence>
 
-      <div className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)] md:bottom-6 flex flex-col items-end gap-3">
+      <div className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+0.25rem)] md:bottom-6 flex flex-col items-end gap-3">
         <AnimatePresence>
           {actionSheetOpen && (
             <>
@@ -852,23 +852,19 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
                   { key: "note", label: "Note", cls: "bg-natural-olive text-white", node: <PenTool className="w-5 h-5" />, run: () => { setError(""); setIsComposerOpen(true); } }
                 ].filter(Boolean) as { key: string; label: string; cls: string; node: React.ReactNode; run: () => void }[];
                 return actions.map((a, i) => (
-                  <motion.div
+                  <motion.button
+                    id={`fab-action-${a.key}`}
                     key={a.key}
-                    className="flex items-center gap-2.5"
+                    onClick={() => { setActionSheetOpen(false); a.run(); }}
+                    title={a.label}
+                    aria-label={a.label}
                     initial={{ opacity: 0, y: 14, scale: 0.5 }}
                     animate={{ opacity: 1, y: 0, scale: 1, transition: { delay: (actions.length - 1 - i) * 0.04, type: "spring", stiffness: 500, damping: 26 } }}
                     exit={{ opacity: 0, y: 14, scale: 0.5, transition: { delay: i * 0.03 } }}
+                    className={`w-12 h-12 rounded-full border border-natural-border shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${a.cls}`}
                   >
-                    <span className="text-[11px] font-serif italic text-natural-text bg-white/95 border border-natural-border rounded-full px-2.5 py-1 shadow-sm">{a.label}</span>
-                    <button
-                      id={`fab-action-${a.key}`}
-                      onClick={() => { setActionSheetOpen(false); a.run(); }}
-                      className={`w-12 h-12 rounded-full border border-natural-border shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${a.cls}`}
-                      title={a.label}
-                    >
-                      {a.node}
-                    </button>
-                  </motion.div>
+                    {a.node}
+                  </motion.button>
                 ));
               })()}
             </>

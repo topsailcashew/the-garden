@@ -755,7 +755,7 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
         onClick={() => { setError(""); setShowVault(true); }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.92 }}
-        className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)] md:bottom-6 bg-natural-olive hover:bg-natural-olive-hover text-white rounded-full shadow-lg py-3.5 px-5 flex items-center gap-2 font-serif italic text-sm cursor-pointer"
+        className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+0.25rem)] md:bottom-6 bg-natural-olive hover:bg-natural-olive-hover text-white rounded-full shadow-lg py-3.5 px-5 flex items-center gap-2 font-serif italic text-sm cursor-pointer"
         title="Queue up questions for future Daily Quests"
       >
         <Archive className="w-4 h-4" /> Questions Vault

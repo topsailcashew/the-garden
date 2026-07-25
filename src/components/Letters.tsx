@@ -388,7 +388,7 @@ export default function Letters({ session, avatars, skinToneMod = "" }: LettersP
         onClick={openComposer}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.85 }}
-        className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)] md:bottom-6 w-14 h-14 rounded-full bg-natural-olive hover:bg-natural-olive-hover text-white shadow-lg flex items-center justify-center cursor-pointer"
+        className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+0.25rem)] md:bottom-6 w-14 h-14 rounded-full bg-natural-olive hover:bg-natural-olive-hover text-white shadow-lg flex items-center justify-center cursor-pointer"
         title="Write a letter"
       >
         <Feather className="w-5 h-5" />
