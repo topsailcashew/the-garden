@@ -8,8 +8,9 @@ import { useConfirm } from "./ConfirmDialog";
 import ReactionPicker from "./ReactionPicker";
 import NoteCommentBox from "./NoteComment";
 import MusicShare from "./MusicShare";
+import BottomSheet from "./BottomSheet";
 import { withTone, stripTone } from "../skinTone";
-import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check, Music } from "lucide-react";
+import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check, Music, Plus } from "lucide-react";
 
 const NOTES_PAGE_SIZE = 30;
 
@@ -231,6 +232,7 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
   const [noteFilter, setNoteFilter] = useState<"all" | "mine" | "partner" | "starred">("all");
   const [reactionPickerNoteId, setReactionPickerNoteId] = useState<string | null>(null);
   const [isMusicOpen, setIsMusicOpen] = useState<boolean>(false);
+  const [actionSheetOpen, setActionSheetOpen] = useState<boolean>(false);
   const [content, setContent] = useState<string>("");
   const [paperType, setPaperType] = useState<Note["paperType"]>("rose");
   const [emoji, setEmoji] = useState<string>("💌");
@@ -596,10 +598,10 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
                 e.stopPropagation();
                 handleToggleStar(note.id, note.starred);
               }}
-              className={`transition-all cursor-pointer ${note.starred ? "text-amber-400 hover:text-amber-500" : "text-stone-400 hover:text-amber-400"}`}
+              className={`p-2 -m-1 rounded-full active:scale-90 transition-all cursor-pointer ${note.starred ? "text-amber-400 hover:text-amber-500" : "text-stone-400 hover:text-amber-400"}`}
               title={note.starred ? "Remove from favorites" : "Add to favorites"}
             >
-              <Star className="w-3.5 h-3.5" fill={note.starred ? "currentColor" : "none"} />
+              <Star className="w-4 h-4" fill={note.starred ? "currentColor" : "none"} />
             </button>
             {isOwn && (
               <button
@@ -608,10 +610,10 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
                   e.stopPropagation();
                   handleDeleteNote(note.id);
                 }}
-                className="text-stone-400 hover:text-natural-terracotta transition-all cursor-pointer"
+                className="p-2 -m-1 rounded-full active:scale-90 text-stone-400 hover:text-natural-terracotta transition-all cursor-pointer"
                 title="Delete this note"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -824,55 +826,48 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
         )}
       </div>
 
-      {/* Floating action cluster, bottom-right: send a hug + share a song + write a note */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
-        {onSendHug && (
-          <motion.button
-            id="btn-send-hug"
-            onClick={onSendHug}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.85 }}
-            className="w-14 h-14 rounded-full bg-white border border-natural-border shadow-lg flex items-center justify-center text-2xl cursor-pointer"
-            title={`Send ${session.partnerName} a virtual hug`}
+      {/* Single "+" action button — sits above the mobile bottom nav */}
+      <motion.button
+        id="btn-actions"
+        onClick={() => setActionSheetOpen(true)}
+        whileTap={{ scale: 0.88 }}
+        className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)] md:bottom-6 w-14 h-14 rounded-full bg-natural-olive hover:bg-natural-olive-hover text-white shadow-lg flex items-center justify-center cursor-pointer"
+        title="Add / send"
+      >
+        <Plus className="w-7 h-7" />
+      </motion.button>
+
+      {/* Action sheet: write a note / send a song / send a hug */}
+      <BottomSheet open={actionSheetOpen} onClose={() => setActionSheetOpen(false)} title="What would you like to do?" maxWidthClass="max-w-sm">
+        <div className="p-4 pt-1 space-y-2">
+          <button
+            id="action-write-note"
+            onClick={() => { setActionSheetOpen(false); setError(""); setIsComposerOpen(true); }}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-natural-border active:scale-[0.98] transition-all cursor-pointer text-left"
           >
-            🤗
-          </motion.button>
-        )}
-
-        <motion.button
-          id="btn-share-song"
-          onClick={() => setIsMusicOpen(true)}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.85 }}
-          className="w-14 h-14 rounded-full bg-white border border-natural-border shadow-lg flex items-center justify-center text-natural-terracotta cursor-pointer"
-          title={`Send ${session.partnerName} a song`}
-        >
-          <Music className="w-6 h-6" />
-        </motion.button>
-
-        <motion.button
-          id="btn-open-composer"
-          onClick={() => {
-            setError("");
-            setIsComposerOpen(true);
-          }}
-          animate={{
-            y: [0, -5, 0],
-            boxShadow: [
-              "0 8px 20px -4px rgba(90,90,64,0.35)",
-              "0 14px 28px -4px rgba(204,122,92,0.55)",
-              "0 8px 20px -4px rgba(90,90,64,0.35)"
-            ]
-          }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          whileHover={{ scale: 1.1, y: 0 }}
-          whileTap={{ scale: 0.85 }}
-          className="w-14 h-14 rounded-full bg-natural-olive hover:bg-natural-olive-hover text-white shadow-lg flex items-center justify-center cursor-pointer"
-          title="Write a note"
-        >
-          <PenTool className="w-5 h-5" />
-        </motion.button>
-      </div>
+            <span className="w-11 h-11 rounded-full bg-natural-olive/10 text-natural-olive flex items-center justify-center flex-shrink-0"><PenTool className="w-5 h-5" /></span>
+            <span><span className="block text-sm font-serif italic text-natural-text">Write a note</span><span className="block text-[11px] text-natural-text/50">Leave a sweet note or photo</span></span>
+          </button>
+          <button
+            id="action-send-song"
+            onClick={() => { setActionSheetOpen(false); setIsMusicOpen(true); }}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-natural-border active:scale-[0.98] transition-all cursor-pointer text-left"
+          >
+            <span className="w-11 h-11 rounded-full bg-natural-terracotta/10 text-natural-terracotta flex items-center justify-center flex-shrink-0"><Music className="w-5 h-5" /></span>
+            <span><span className="block text-sm font-serif italic text-natural-text">Send a song</span><span className="block text-[11px] text-natural-text/50">Share something for {session.partnerName} to hear</span></span>
+          </button>
+          {onSendHug && (
+            <button
+              id="action-send-hug"
+              onClick={() => { setActionSheetOpen(false); onSendHug(); }}
+              className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-natural-border active:scale-[0.98] transition-all cursor-pointer text-left"
+            >
+              <span className="w-11 h-11 rounded-full bg-natural-green/10 flex items-center justify-center flex-shrink-0 text-xl">🤗</span>
+              <span><span className="block text-sm font-serif italic text-natural-text">Send a hug</span><span className="block text-[11px] text-natural-text/50">A little warmth, right now</span></span>
+            </button>
+          )}
+        </div>
+      </BottomSheet>
 
       {/* Composer modal */}
       <AnimatePresence>

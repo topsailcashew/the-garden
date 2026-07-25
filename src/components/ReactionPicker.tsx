@@ -30,17 +30,19 @@ export default function ReactionPicker({ open, currentReaction, onSelect, onClos
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 z-[95] bg-black/40 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[95] bg-black/40 flex items-end sm:items-center justify-center sm:p-4"
         >
           <motion.div
             id="reaction-picker-panel"
-            initial={{ opacity: 0, scale: 0.9, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 16 }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 34, stiffness: 360 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white/70 backdrop-blur-xl border border-white/50 rounded-[28px] p-5 shadow-2xl w-full max-w-xs"
+            className="bg-white/80 backdrop-blur-xl border border-white/50 rounded-t-[28px] sm:rounded-[28px] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 shadow-2xl w-full sm:max-w-xs"
           >
-            <div className="flex justify-end items-center mb-2">
+            <div className="flex justify-center sm:hidden mb-2"><div className="w-10 h-1.5 rounded-full bg-natural-border" /></div>
+            <div className="flex justify-end items-center mb-2 -mt-1">
               <button
                 id="btn-close-reaction-picker"
                 onClick={onClose}

@@ -220,7 +220,7 @@ export default function App() {
   return (
     <div id="app-root" className="min-h-screen bg-natural-bg text-natural-text font-sans relative flex flex-col justify-between">
       {/* Top Header */}
-      <header className="bg-natural-bg border-b border-natural-border py-4 px-6 sticky top-0 z-40">
+      <header className="glass border-b border-natural-border pb-4 px-5 sm:px-6 pt-[calc(env(safe-area-inset-top)+1rem)] sticky top-0 z-40">
         <div className="max-w-6xl mx-auto flex flex-row justify-between items-center gap-4">
           {/* Logo & Names */}
           <div className="flex flex-col">
@@ -392,10 +392,10 @@ export default function App() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 pb-28 space-y-6">
-        
-        {/* Navigation Tabs Bar */}
-        <div className="flex flex-wrap items-center justify-center gap-1 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1.25rem)] md:pb-12 space-y-6">
+
+        {/* Navigation Tabs Bar — desktop only; mobile uses the bottom bar */}
+        <div className="hidden md:flex flex-wrap items-center justify-center gap-1 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm">
           {navTabs.map(({ key, label, Icon }) => {
             const isActive = activeTab === key;
             return (
@@ -434,8 +434,8 @@ export default function App() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="mt-8 flex justify-between items-center text-[10px] uppercase tracking-[0.3em] opacity-60 border-t border-natural-border pt-6 max-w-6xl w-full mx-auto px-6 pb-28 select-none">
+      {/* Footer — desktop only (mobile is a native full-height app) */}
+      <footer className="hidden md:flex mt-8 justify-between items-center text-[10px] uppercase tracking-[0.3em] opacity-60 border-t border-natural-border pt-6 max-w-6xl w-full mx-auto px-6 pb-10 select-none">
         <span>
           {roomCreatedAt
             ? `Est. ${new Date(roomCreatedAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}`
@@ -446,6 +446,28 @@ export default function App() {
           <span>Both partners connected</span>
         </div>
       </footer>
+
+      {/* Bottom tab bar — mobile native navigation */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass border-t border-natural-border pb-safe">
+        <div className="flex items-stretch justify-around px-1">
+          {navTabs.map(({ key, label, Icon }) => {
+            const isActive = activeTab === key;
+            return (
+              <button
+                id={`bnav-${key}`}
+                key={key}
+                onClick={() => setActiveTab(key)}
+                aria-label={label}
+                aria-current={isActive ? "page" : undefined}
+                className="flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 min-h-[58px] active:scale-90 transition-transform"
+              >
+                <Icon className={isActive ? "w-[22px] h-[22px] text-natural-olive" : "w-[22px] h-[22px] text-natural-text/45"} strokeWidth={isActive ? 2.4 : 2} />
+                <span className={isActive ? "text-[10px] leading-none text-natural-olive font-semibold" : "text-[10px] leading-none text-natural-text/45"}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* Virtual hug overlay — plays for 3 seconds on both partners' screens */}
       <AnimatePresence>
