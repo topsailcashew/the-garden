@@ -9,7 +9,7 @@ import './index.css';
 // Flipped to false once the database migration + cutover is complete. While
 // true, only the holding page renders — App and its Firestore listeners never
 // mount, so no reads are consumed.
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

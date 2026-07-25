@@ -13,6 +13,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize with the custom Firestore database ID using getFirestore
-const db = getFirestore(app, "ai-studio-courtshipjournal-5c5f10ff-7592-4e25-a368-e6c026b00ec8");
+const db = getFirestore(app, "the-garden");
 
 export { db };
