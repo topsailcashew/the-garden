@@ -394,7 +394,7 @@ export default function App() {
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 pb-28 space-y-6">
         
         {/* Navigation Tabs Bar */}
-        <div className="flex items-center justify-start md:justify-center gap-1.5 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm overflow-x-auto scrollbar-none">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm">
           {navTabs.map(({ key, label, Icon }) => {
             const isActive = activeTab === key;
             return (
