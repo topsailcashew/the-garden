@@ -19,12 +19,12 @@ const avatarOptions = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "🤴", 
 
 // The nav only spells out the section you're in; the rest collapse to icon pills.
 const navTabs = [
-  { key: "notes", label: "Notes Board", Icon: Mail },
-  { key: "quest", label: "Daily Quest", Icon: Sparkles },
-  { key: "letters", label: "Writing Desk", Icon: Feather },
-  { key: "prayer", label: "Prayer Wall", Icon: HandHeart },
+  { key: "notes", label: "Notes", Icon: Mail },
+  { key: "quest", label: "Quest", Icon: Sparkles },
+  { key: "letters", label: "Letters", Icon: Feather },
+  { key: "prayer", label: "Prayers", Icon: HandHeart },
   { key: "scratch", label: "Scratchpad", Icon: StickyNote },
-  { key: "dates", label: "Date Planner", Icon: Calendar }
+  { key: "dates", label: "Dates", Icon: Calendar }
 ] as const;
 
 type TabKey = (typeof navTabs)[number]["key"];
@@ -394,7 +394,7 @@ export default function App() {
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 pb-28 space-y-6">
         
         {/* Navigation Tabs Bar */}
-        <div className="flex flex-wrap items-center justify-center gap-1.5 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm">
+        <div className="flex flex-wrap items-center justify-center gap-1 bg-natural-card p-1 rounded-2xl border border-natural-border shadow-sm">
           {navTabs.map(({ key, label, Icon }) => {
             const isActive = activeTab === key;
             return (
@@ -407,8 +407,8 @@ export default function App() {
                 aria-current={isActive ? "page" : undefined}
                 className={`flex flex-shrink-0 items-center justify-center py-3 rounded-xl text-xs font-medium font-serif italic cursor-pointer transition-colors ${
                   isActive
-                    ? "px-5 bg-natural-olive text-white shadow-sm font-semibold"
-                    : "px-4 text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
+                    ? "px-3.5 bg-natural-olive text-white shadow-sm font-semibold"
+                    : "px-2.5 text-natural-text/60 hover:text-natural-text hover:bg-natural-card-darker/45"
                 }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
