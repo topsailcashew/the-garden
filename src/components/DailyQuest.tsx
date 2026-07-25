@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit, getDocs, documentId } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { Question, VaultQuestion, UserSession } from "../types";
 import { getQuestionOfToday } from "../data/questions";
@@ -130,9 +130,9 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
     const fetchHistory = async () => {
       try {
         const qCollection = collection(db, "rooms", session.roomId, "questions");
-        // Cap the history read; question ids are date-based (q_YYYY_MM_DD) so
-        // ordering by id descending yields the most recent quests.
-        const querySnapshot = await getDocs(query(qCollection, orderBy(documentId(), "desc"), limit(90)));
+        // Read all quests, then sort client-side below. (A server-side
+        // orderBy(documentId(), "desc") needs a dedicated index, so we avoid it.)
+        const querySnapshot = await getDocs(qCollection);
         const list: Question[] = [];
         querySnapshot.forEach((docSnap) => {
           if (docSnap.id !== todayId) {
