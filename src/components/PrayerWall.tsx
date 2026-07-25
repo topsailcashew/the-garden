@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { PrayerRequest, UserSession } from "../types";
 import { useToast } from "./Toast";
@@ -41,7 +41,7 @@ export default function PrayerWall({ session, avatars }: PrayerWallProps) {
 
   useEffect(() => {
     const ref = collection(db, "rooms", session.roomId, "prayers");
-    const q = query(ref, orderBy("createdAt", "desc"));
+    const q = query(ref, orderBy("createdAt", "desc"), limit(50));
     const unsub = onSnapshot(
       q,
       (snap) => {

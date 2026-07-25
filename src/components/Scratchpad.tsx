@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { ScratchItem, UserSession } from "../types";
 import { useToast } from "./Toast";
@@ -22,7 +22,7 @@ export default function Scratchpad({ session, avatars }: ScratchpadProps) {
 
   useEffect(() => {
     const ref = collection(db, "rooms", session.roomId, "scratch");
-    const q = query(ref, orderBy("createdAt", "desc"));
+    const q = query(ref, orderBy("createdAt", "desc"), limit(60));
     const unsub = onSnapshot(
       q,
       (snap) => {

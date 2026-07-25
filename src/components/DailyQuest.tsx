@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit, getDocs, documentId } from "firebase/firestore";
 import { db } from "../firebase";
 import { Question, VaultQuestion, UserSession } from "../types";
 import { getQuestionOfToday } from "../data/questions";
@@ -111,7 +111,7 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
     // Live subscription to the shared Questions Vault (FIFO by creation time).
     const vaultRef = collection(db, "rooms", session.roomId, "vault");
     const unsubscribe = onSnapshot(
-      query(vaultRef, orderBy("createdAt", "asc")),
+      query(vaultRef, orderBy("createdAt", "asc"), limit(50)),
       (snap) => {
         const list: VaultQuestion[] = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() } as VaultQuestion));
@@ -130,7 +130,9 @@ export default function DailyQuest({ session, skinToneMod = "" }: DailyQuestProp
     const fetchHistory = async () => {
       try {
         const qCollection = collection(db, "rooms", session.roomId, "questions");
-        const querySnapshot = await getDocs(qCollection);
+        // Cap the history read; question ids are date-based (q_YYYY_MM_DD) so
+        // ordering by id descending yields the most recent quests.
+        const querySnapshot = await getDocs(query(qCollection, orderBy(documentId(), "desc"), limit(90)));
         const list: Question[] = [];
         querySnapshot.forEach((docSnap) => {
           if (docSnap.id !== todayId) {

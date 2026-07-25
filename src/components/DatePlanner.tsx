@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { DatePlan, UserSession } from "../types";
 import { useToast } from "./Toast";
@@ -118,7 +118,7 @@ export default function DatePlanner({ session }: DatePlannerProps) {
   useEffect(() => {
     // Subscription to date plans in the current room
     const datesRef = collection(db, "rooms", session.roomId, "dates");
-    const q = query(datesRef, orderBy("date", "asc"));
+    const q = query(datesRef, orderBy("date", "asc"), limit(80));
 
     const unsubscribe = onSnapshot(
       q,

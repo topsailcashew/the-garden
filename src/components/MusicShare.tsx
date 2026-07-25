@@ -94,7 +94,7 @@ export default function MusicShare({ session, avatars, open, onClose }: MusicSha
 
   useEffect(() => {
     const ref = collection(db, "rooms", session.roomId, "songs");
-    const q = query(ref, orderBy("createdAt", "desc"), limit(50));
+    const q = query(ref, orderBy("createdAt", "desc"), limit(30));
     const unsub = onSnapshot(
       q,
       (snap) => {
