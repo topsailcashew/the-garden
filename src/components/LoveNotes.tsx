@@ -8,7 +8,6 @@ import { useConfirm } from "./ConfirmDialog";
 import ReactionPicker from "./ReactionPicker";
 import NoteCommentBox from "./NoteComment";
 import MusicShare from "./MusicShare";
-import BottomSheet from "./BottomSheet";
 import { withTone, stripTone } from "../skinTone";
 import { PenTool, SmilePlus, MessageSquareHeart, Trash2, Eye, Mail, Star, Sparkles, Smile, Flame, ImagePlus, X, Loader2, Search, Check, Music, Plus } from "lucide-react";
 
@@ -826,48 +825,69 @@ export default function LoveNotes({ session, avatars, onSendHug, skinToneMod = "
         )}
       </div>
 
-      {/* Single "+" action button — sits above the mobile bottom nav */}
-      <motion.button
-        id="btn-actions"
-        onClick={() => setActionSheetOpen(true)}
-        whileTap={{ scale: 0.88 }}
-        className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)] md:bottom-6 w-14 h-14 rounded-full bg-natural-olive hover:bg-natural-olive-hover text-white shadow-lg flex items-center justify-center cursor-pointer"
-        title="Add / send"
-      >
-        <Plus className="w-7 h-7" />
-      </motion.button>
+      {/* Speed-dial: the "+" fans out a stack of mini action buttons */}
+      <AnimatePresence>
+        {actionSheetOpen && (
+          <motion.div
+            id="fab-scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActionSheetOpen(false)}
+            className="fixed inset-0 z-[49] bg-black/25 backdrop-blur-[1px]"
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Action sheet: write a note / send a song / send a hug */}
-      <BottomSheet open={actionSheetOpen} onClose={() => setActionSheetOpen(false)} title="What would you like to do?" maxWidthClass="max-w-sm">
-        <div className="p-4 pt-1 space-y-2">
-          <button
-            id="action-write-note"
-            onClick={() => { setActionSheetOpen(false); setError(""); setIsComposerOpen(true); }}
-            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-natural-border active:scale-[0.98] transition-all cursor-pointer text-left"
-          >
-            <span className="w-11 h-11 rounded-full bg-natural-olive/10 text-natural-olive flex items-center justify-center flex-shrink-0"><PenTool className="w-5 h-5" /></span>
-            <span><span className="block text-sm font-serif italic text-natural-text">Write a note</span><span className="block text-[11px] text-natural-text/50">Leave a sweet note or photo</span></span>
-          </button>
-          <button
-            id="action-send-song"
-            onClick={() => { setActionSheetOpen(false); setIsMusicOpen(true); }}
-            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-natural-border active:scale-[0.98] transition-all cursor-pointer text-left"
-          >
-            <span className="w-11 h-11 rounded-full bg-natural-terracotta/10 text-natural-terracotta flex items-center justify-center flex-shrink-0"><Music className="w-5 h-5" /></span>
-            <span><span className="block text-sm font-serif italic text-natural-text">Send a song</span><span className="block text-[11px] text-natural-text/50">Share something for {session.partnerName} to hear</span></span>
-          </button>
-          {onSendHug && (
-            <button
-              id="action-send-hug"
-              onClick={() => { setActionSheetOpen(false); onSendHug(); }}
-              className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-natural-border active:scale-[0.98] transition-all cursor-pointer text-left"
-            >
-              <span className="w-11 h-11 rounded-full bg-natural-green/10 flex items-center justify-center flex-shrink-0 text-xl">🤗</span>
-              <span><span className="block text-sm font-serif italic text-natural-text">Send a hug</span><span className="block text-[11px] text-natural-text/50">A little warmth, right now</span></span>
-            </button>
+      <div className="fixed z-50 right-5 md:right-6 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)] md:bottom-6 flex flex-col items-end gap-3">
+        <AnimatePresence>
+          {actionSheetOpen && (
+            <>
+              {(() => {
+                // Nearest the "+" is the note action; hug sits at the top. The
+                // stagger makes them appear to pop out of the "+".
+                const actions = [
+                  onSendHug && { key: "hug", label: "Hug", cls: "bg-white text-xl", node: "🤗", run: () => onSendHug() },
+                  { key: "song", label: "Song", cls: "bg-white text-natural-terracotta", node: <Music className="w-5 h-5" />, run: () => setIsMusicOpen(true) },
+                  { key: "note", label: "Note", cls: "bg-natural-olive text-white", node: <PenTool className="w-5 h-5" />, run: () => { setError(""); setIsComposerOpen(true); } }
+                ].filter(Boolean) as { key: string; label: string; cls: string; node: React.ReactNode; run: () => void }[];
+                return actions.map((a, i) => (
+                  <motion.div
+                    key={a.key}
+                    className="flex items-center gap-2.5"
+                    initial={{ opacity: 0, y: 14, scale: 0.5 }}
+                    animate={{ opacity: 1, y: 0, scale: 1, transition: { delay: (actions.length - 1 - i) * 0.04, type: "spring", stiffness: 500, damping: 26 } }}
+                    exit={{ opacity: 0, y: 14, scale: 0.5, transition: { delay: i * 0.03 } }}
+                  >
+                    <span className="text-[11px] font-serif italic text-natural-text bg-white/95 border border-natural-border rounded-full px-2.5 py-1 shadow-sm">{a.label}</span>
+                    <button
+                      id={`fab-action-${a.key}`}
+                      onClick={() => { setActionSheetOpen(false); a.run(); }}
+                      className={`w-12 h-12 rounded-full border border-natural-border shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${a.cls}`}
+                      title={a.label}
+                    >
+                      {a.node}
+                    </button>
+                  </motion.div>
+                ));
+              })()}
+            </>
           )}
-        </div>
-      </BottomSheet>
+        </AnimatePresence>
+
+        <motion.button
+          id="btn-actions"
+          onClick={() => setActionSheetOpen((o) => !o)}
+          whileTap={{ scale: 0.88 }}
+          animate={{ rotate: actionSheetOpen ? 45 : 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 28 }}
+          className="w-14 h-14 rounded-full bg-natural-olive hover:bg-natural-olive-hover text-white shadow-lg flex items-center justify-center cursor-pointer self-end"
+          title="Add / send"
+          aria-expanded={actionSheetOpen}
+        >
+          <Plus className="w-7 h-7" />
+        </motion.button>
+      </div>
 
       {/* Composer modal */}
       <AnimatePresence>
